@@ -1,3 +1,4 @@
+const { sendEmail } = require("../utils/mailer");
 const express = require("express");
 const multer = require("multer");
 const csv = require("csv-parser");
@@ -109,6 +110,18 @@ router.post("/", upload.single("file"), async (req, res) => {
       // ordered: false lets the batch keep going even if one document fails to insert
       const inserted = await Record.insertMany(validDocs, { ordered: false });
       insertedCount = inserted.length;
+	 for (const doc of inserted) {
+  try {
+    await sendEmail(doc);
+    await Record.findByIdAndUpdate(doc._id, {
+      emailSent: true,
+      emailSentAt: new Date(),
+    });
+  } catch (err) {
+    await Record.findByIdAndUpdate(doc._id, { error: err.message });
+  }
+}
+
     }
   } catch (err) {
     return res.status(500).json({

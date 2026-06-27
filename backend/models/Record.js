@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { v4: uuidv4 } = require("uuid");
 
 const recordSchema = new mongoose.Schema(
   {
@@ -17,7 +18,16 @@ const recordSchema = new mongoose.Schema(
       enum: ["ASSSR", "VMI", "DHC", "JASSSR"],
     },
 
-    // Used once email-sending is wired up — the dashboard already reads these.
+    // Unique token for the form link sent to the user
+    token: { type: String, default: uuidv4, unique: true },
+
+    // Tracks whether the user submitted the form
+    formSubmitted: { type: Boolean, default: false },
+
+    // Stores the submitted form data (fields vary by category/service)
+    formData: { type: Object, default: null },
+
+    // Email tracking fields
     emailSent: { type: Boolean, default: false },
     emailSentAt: { type: Date, default: null },
     error: { type: String, default: null },
