@@ -31,6 +31,14 @@ const recordSchema = new mongoose.Schema(
     emailSent: { type: Boolean, default: false },
     emailSentAt: { type: Date, default: null },
     error: { type: String, default: null },
+
+    // Registrar approval tracking
+    registrarApproved: { type: Boolean, default: false },
+    registrarApprovedAt: { type: Date, default: null },
+
+    // Admin payment tracking
+    paymentProcessed: { type: Boolean, default: false },
+    paymentProcessedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

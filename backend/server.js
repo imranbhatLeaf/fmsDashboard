@@ -6,6 +6,7 @@ const connectDB = require("./config/db");
 const recordsRouter = require("./routes/records");
 const uploadRouter = require("./routes/upload");
 const formRouter = require("./routes/form");
+const authRouter = require("./routes/auth");
 
 const app = express();
 
@@ -14,6 +15,7 @@ app.use(express.json());
 
 connectDB();
 
+app.use("/api/auth", authRouter);
 app.use("/api/records", recordsRouter);
 app.use("/api/upload", uploadRouter);
 app.use("/api/form", formRouter);

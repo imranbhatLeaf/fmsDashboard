@@ -15,4 +15,36 @@ router.get("/", async (req, res) => {
   }
 });
 
+// PUT /api/records/:id/approve
+router.put("/:id/approve", async (req, res) => {
+  try {
+    const record = await Record.findById(req.params.id);
+    if (!record) return res.status(404).json({ message: "Record not found" });
+    
+    record.registrarApproved = true;
+    record.registrarApprovedAt = new Date();
+    await record.save();
+    
+    res.json(record);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PUT /api/records/:id/process
+router.put("/:id/process", async (req, res) => {
+  try {
+    const record = await Record.findById(req.params.id);
+    if (!record) return res.status(404).json({ message: "Record not found" });
+    
+    record.paymentProcessed = true;
+    record.paymentProcessedAt = new Date();
+    await record.save();
+    
+    res.json(record);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

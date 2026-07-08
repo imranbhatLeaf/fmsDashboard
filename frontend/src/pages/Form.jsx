@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import logo from "../assets/logomain.avif";
+import asssrLogo from "../assets/asssr.avif";
 
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
 
 // Bank details fields — common to all forms
 function BankDetails({ data, onChange }) {
   return (
-    <fieldset className="mt-8 border border-[#e4dfd4] rounded-xl p-6 bg-[#fbfaf7]">
-      <legend className="text-[11px] uppercase tracking-wider text-[#5a6270] px-2 font-semibold">
+    <fieldset className="mt-8 border border-[#e0e0e0] rounded-xl p-6 bg-[#fafafa]">
+      <legend className="text-[10px] uppercase tracking-widest text-[#888] px-2 font-semibold">
         Bank Account Details (all fields mandatory)
       </legend>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -47,8 +49,8 @@ function PersonalDetails({ data, onChange, showDesignation = true }) {
 function Field({ label, name, value, onChange, required, disabled, type = "text" }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-medium text-[#5a6270] uppercase tracking-wide">
-        {label}{required && <span className="text-[#8c4a4a] ml-0.5">*</span>}
+      <label className="text-[10px] font-semibold text-[#888] uppercase tracking-widest">
+        {label}{required && <span className="text-black ml-0.5">*</span>}
       </label>
       <input
         type={type}
@@ -57,7 +59,7 @@ function Field({ label, name, value, onChange, required, disabled, type = "text"
         onChange={onChange}
         disabled={disabled}
         required={required}
-        className="border border-[#e4dfd4] rounded-lg px-3 py-2 text-sm bg-white text-[#1b2430] focus:outline-none focus:border-[#b98a2e] focus:ring-1 focus:ring-[#b98a2e] disabled:bg-[#f0eee8] disabled:text-[#5a6270] disabled:cursor-not-allowed transition-colors"
+        className="border border-[#ddd] rounded-lg px-3 py-2 text-sm bg-white text-black focus:outline-none focus:border-black focus:ring-1 focus:ring-black disabled:bg-[#f5f5f0] disabled:text-[#999] disabled:cursor-not-allowed transition-colors"
       />
     </div>
   );
@@ -66,15 +68,15 @@ function Field({ label, name, value, onChange, required, disabled, type = "text"
 function Select({ label, name, value, onChange, required, options }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-medium text-[#5a6270] uppercase tracking-wide">
-        {label}{required && <span className="text-[#8c4a4a] ml-0.5">*</span>}
+      <label className="text-[10px] font-semibold text-[#888] uppercase tracking-widest">
+        {label}{required && <span className="text-black ml-0.5">*</span>}
       </label>
       <select
         name={name}
         value={value || ""}
         onChange={onChange}
         required={required}
-        className="border border-[#e4dfd4] rounded-lg px-3 py-2 text-sm bg-white text-[#1b2430] focus:outline-none focus:border-[#b98a2e] focus:ring-1 focus:ring-[#b98a2e] transition-colors"
+        className="border border-[#ddd] rounded-lg px-3 py-2 text-sm bg-white text-black focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-colors"
       >
         <option value="">Select…</option>
         {options.map((o) => (
@@ -88,12 +90,12 @@ function Select({ label, name, value, onChange, required, options }) {
 function RadioGroup({ label, name, value, onChange, required, options }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-xs font-medium text-[#5a6270] uppercase tracking-wide">
-        {label}{required && <span className="text-[#8c4a4a] ml-0.5">*</span>}
+      <span className="text-[10px] font-semibold text-[#888] uppercase tracking-widest">
+        {label}{required && <span className="text-black ml-0.5">*</span>}
       </span>
       <div className="flex gap-4 flex-wrap">
         {options.map((o) => (
-          <label key={o} className="flex items-center gap-2 text-sm cursor-pointer">
+          <label key={o} className="flex items-center gap-2 text-sm cursor-pointer text-[#333]">
             <input
               type="radio"
               name={name}
@@ -101,7 +103,7 @@ function RadioGroup({ label, name, value, onChange, required, options }) {
               checked={value === o}
               onChange={onChange}
               required={required}
-              className="accent-[#b98a2e]"
+              className="accent-black"
             />
             {o}
           </label>
@@ -148,7 +150,7 @@ function TadaFields({ data, onChange }) {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#5a6270] mb-3">Journey Details</p>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-[#888] mb-3">Journey Details</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="From" name="journeyFrom" value={data.journeyFrom} onChange={onChange} required />
           <Field label="To" name="journeyTo" value={data.journeyTo} onChange={onChange} required />
@@ -157,7 +159,7 @@ function TadaFields({ data, onChange }) {
         </div>
       </div>
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#5a6270] mb-3">Local Journey Details</p>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-[#888] mb-3">Local Journey Details</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="From" name="localFrom" value={data.localFrom} onChange={onChange} />
           <Field label="To" name="localTo" value={data.localTo} onChange={onChange} />
@@ -247,21 +249,21 @@ export default function FormPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f8f6f2] flex items-center justify-center">
-        <p className="text-[#5a6270] text-sm">Loading your form…</p>
+      <div className="min-h-screen bg-[#f5f5f0] flex items-center justify-center">
+        <p className="text-[#888] text-sm">Loading your form…</p>
       </div>
     );
   }
 
   if (error === "already_submitted") {
     return (
-      <div className="min-h-screen bg-[#f8f6f2] flex items-center justify-center px-4">
-        <div className="bg-white border border-[#e4dfd4] rounded-xl p-8 max-w-md text-center">
-          <div className="w-10 h-10 rounded-full bg-[#e4efed] flex items-center justify-center mx-auto mb-4">
-            <span className="text-[#3e7c74] text-lg">✓</span>
+      <div className="min-h-screen bg-[#f5f5f0] flex items-center justify-center px-4">
+        <div className="bg-white border border-[#e0e0e0] rounded-xl p-8 max-w-md text-center">
+          <div className="w-10 h-10 rounded-full bg-[#f0f0f0] border border-[#e0e0e0] flex items-center justify-center mx-auto mb-4">
+            <span className="text-black text-lg">✓</span>
           </div>
-          <h2 className="font-serif text-xl font-semibold mb-2">Already submitted</h2>
-          <p className="text-sm text-[#5a6270]">Your form has already been submitted. Please contact the accounts section if you need to make changes.</p>
+          <h2 className="font-serif text-xl font-semibold mb-2 text-black">Already submitted</h2>
+          <p className="text-sm text-[#666]">Your form has already been submitted. Please contact the accounts section if you need to make changes.</p>
         </div>
       </div>
     );
@@ -269,10 +271,10 @@ export default function FormPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#f8f6f2] flex items-center justify-center px-4">
-        <div className="bg-white border border-[#e4dfd4] rounded-xl p-8 max-w-md text-center">
-          <h2 className="font-serif text-xl font-semibold mb-2 text-[#8c4a4a]">Invalid link</h2>
-          <p className="text-sm text-[#5a6270]">This form link is invalid or has expired. Please contact the accounts section.</p>
+      <div className="min-h-screen bg-[#f5f5f0] flex items-center justify-center px-4">
+        <div className="bg-white border border-[#e0e0e0] rounded-xl p-8 max-w-md text-center">
+          <h2 className="font-serif text-xl font-semibold mb-2 text-black">Invalid link</h2>
+          <p className="text-sm text-[#666]">This form link is invalid or has expired. Please contact the accounts section.</p>
         </div>
       </div>
     );
@@ -280,13 +282,13 @@ export default function FormPage() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-[#f8f6f2] flex items-center justify-center px-4">
-        <div className="bg-white border border-[#e4dfd4] rounded-xl p-8 max-w-md text-center">
-          <div className="w-10 h-10 rounded-full bg-[#e4efed] flex items-center justify-center mx-auto mb-4">
-            <span className="text-[#3e7c74] text-lg">✓</span>
+      <div className="min-h-screen bg-[#f5f5f0] flex items-center justify-center px-4">
+        <div className="bg-white border border-[#e0e0e0] rounded-xl p-8 max-w-md text-center">
+          <div className="w-10 h-10 rounded-full bg-[#f0f0f0] border border-[#e0e0e0] flex items-center justify-center mx-auto mb-4">
+            <span className="text-black text-lg">✓</span>
           </div>
-          <h2 className="font-serif text-xl font-semibold mb-2">Form submitted</h2>
-          <p className="text-sm text-[#5a6270]">Your details have been received. The accounts section will process your payment shortly.</p>
+          <h2 className="font-serif text-xl font-semibold mb-2 text-black">Form submitted</h2>
+          <p className="text-sm text-[#666]">Your details have been received. The accounts section will process your payment shortly.</p>
         </div>
       </div>
     );
@@ -295,13 +297,21 @@ export default function FormPage() {
   const { category, services } = meta;
 
   return (
-    <div className="min-h-screen bg-[#f8f6f2] py-10 px-4">
+    <div className="min-h-screen bg-[#f5f5f0] py-10 px-4">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="bg-[#15243d] text-white rounded-xl px-8 py-6 mb-6">
-          <p className="text-xs uppercase tracking-widest text-white/50 mb-1">{services}</p>
-          <h1 className="font-serif text-xl font-semibold">{SERVICE_LABELS[services]}</h1>
-          <p className="text-sm text-white/70 mt-1">
+        <div className="bg-black text-white rounded-xl px-8 py-6 mb-6 relative">
+          <div className="absolute top-6 right-8 flex gap-3 hidden sm:flex">
+            <div className="w-14 h-14 flex items-center justify-center">
+              <img src={logo} alt="AFMS Logo" className="w-full h-full object-contain" />
+            </div>
+            <div className="w-14 h-14 flex items-center justify-center">
+              <img src={asssrLogo} alt="ASSSR Logo" className="w-full h-full object-contain" />
+            </div>
+          </div>
+          <p className="text-[10px] uppercase tracking-widest text-white/50 mb-1">{services}</p>
+          <h1 className="font-serif text-xl font-semibold">{SERVICE_LABELS[services] || services}</h1>
+          <p className="text-sm text-white/60 mt-1 sm:pr-16">
             {category === "TA/DA" ? "Traveling and Dearness Allowance Bill Form" :
              category === "Honorarium" ? "Honorarium Bill Form" :
              category === "Fellowship" ? "Fellowship Bill Form" :
@@ -311,18 +321,18 @@ export default function FormPage() {
         </div>
 
         {/* Instructions */}
-        <div className="bg-[#fffbe6] border border-[#f0d98c] rounded-xl px-6 py-4 mb-6 text-xs text-[#5a4a00] space-y-1">
+        <div className="bg-white border border-[#e0e0e0] rounded-xl px-6 py-4 mb-6 text-xs text-[#555] space-y-1">
           <p>• The bill must be pre-receipted.</p>
           <p>• Incomplete/incorrect applications will be rejected without intimation.</p>
-          <p>• Fields marked with <span className="text-[#8c4a4a]">*</span> are mandatory.</p>
+          <p>• Fields marked with <span className="text-black font-semibold">*</span> are mandatory.</p>
           <p>• Please enclose a copy of your bank passbook or cancelled cheque.</p>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="bg-white border border-[#e4dfd4] rounded-xl p-6 md:p-8 space-y-8">
+        <form onSubmit={handleSubmit} className="bg-white border border-[#e0e0e0] rounded-xl p-6 md:p-8 space-y-8">
           {/* Personal Details */}
           <div>
-            <h2 className="text-[11px] uppercase tracking-wider text-[#5a6270] font-semibold mb-4 pb-2 border-b border-[#e4dfd4]">
+            <h2 className="text-[10px] uppercase tracking-widest text-[#aaa] font-semibold mb-4 pb-2 border-b border-[#f0f0f0]">
               Personal Details
             </h2>
             <PersonalDetails
@@ -334,7 +344,7 @@ export default function FormPage() {
 
           {/* Category-specific fields */}
           <div>
-            <h2 className="text-[11px] uppercase tracking-wider text-[#5a6270] font-semibold mb-4 pb-2 border-b border-[#e4dfd4]">
+            <h2 className="text-[10px] uppercase tracking-widest text-[#aaa] font-semibold mb-4 pb-2 border-b border-[#f0f0f0]">
               {category === "TA/DA" ? "TA/DA Allowance Details" :
                category === "Refund" ? "Refund Details" :
                "Programme Details"}
@@ -344,32 +354,32 @@ export default function FormPage() {
             {category === "TA/DA" && <TadaFields data={formData} onChange={handleChange} />}
             {category === "Refund" && <RefundFields data={formData} onChange={handleChange} />}
             {category === "Salary" && (
-              <p className="text-sm text-[#5a6270]">Please provide your bank details below to receive your salary.</p>
+              <p className="text-sm text-[#666]">Please provide your bank details below to receive your salary.</p>
             )}
           </div>
 
           {/* Bank Details */}
           <div>
-            <h2 className="text-[11px] uppercase tracking-wider text-[#5a6270] font-semibold mb-4 pb-2 border-b border-[#e4dfd4]">
+            <h2 className="text-[10px] uppercase tracking-widest text-[#aaa] font-semibold mb-4 pb-2 border-b border-[#f0f0f0]">
               Bank Account Details
             </h2>
             <BankDetails data={formData} onChange={handleChange} />
           </div>
 
           {formError && (
-            <p className="text-[#8c4a4a] text-sm">{formError}</p>
+            <p className="text-[#555] text-sm border border-[#e0e0e0] rounded-lg px-4 py-3 bg-[#fafafa]">{formError}</p>
           )}
 
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-[#15243d] text-white border-none text-sm font-semibold px-5 py-3 rounded-lg cursor-pointer transition-colors hover:bg-[#1f3354] disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#b98a2e] focus-visible:outline-offset-2"
+            className="w-full bg-black text-white border-none text-sm font-semibold px-5 py-3 rounded-lg cursor-pointer transition-colors hover:bg-[#222] disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-black focus-visible:outline-offset-2"
           >
             {submitting ? "Submitting…" : "Submit Form"}
           </button>
         </form>
 
-        <p className="text-center text-xs text-[#5a6270] mt-4">
+        <p className="text-center text-xs text-[#aaa] mt-4">
           This form was sent to you by {SERVICE_LABELS[services]}. For queries, contact the accounts section.
         </p>
       </div>
