@@ -6,7 +6,8 @@ import Login from './pages/Login'
 import Admin from './pages/Admin'
 import Registrar from './pages/Registrar'
 import Form from './pages/Form'
-
+import Receipt from './pages/Receipt'
+// inside Routes:
 const App = () => {
   return (
     <AuthProvider>
@@ -18,6 +19,8 @@ const App = () => {
           {/* Public */}
           <Route path='/login' element={<Login />} />
           <Route path='/form/:token' element={<Form />} />
+          <Route path='/form/:token' element={<Form />} />
+          <Route path='/receipt/:token' element={<Receipt />} />
 
           {/* Protected */}
           <Route

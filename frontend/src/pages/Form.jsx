@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import logo from "../assets/logomain.avif";
 import asssrLogo from "../assets/asssr.avif";
 
@@ -196,6 +196,7 @@ const SERVICE_LABELS = {
 
 export default function FormPage() {
   const { token } = useParams();
+  const navigate = useNavigate();
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -240,6 +241,7 @@ export default function FormPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Submission failed.");
       setSubmitted(true);
+      navigate(`/receipt/${token}`);
     } catch (err) {
       setFormError(err.message);
     } finally {

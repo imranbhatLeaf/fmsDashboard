@@ -35,5 +35,16 @@ router.post("/:token", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+// GET /api/form/receipt/:token — fetch submitted record for receipt
+router.get("/receipt/:token", async (req, res) => {
+  try {
+    const record = await Record.findOne({ token: req.params.token });
+    if (!record) return res.status(404).json({ message: "Not found." });
+    if (!record.formSubmitted) return res.status(403).json({ message: "Form not yet submitted." });
+    res.json(record);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 module.exports = router;
