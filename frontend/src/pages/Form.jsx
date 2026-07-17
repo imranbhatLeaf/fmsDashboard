@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import logo from "../assets/logomain.avif";
 import asssrLogo from "../assets/asssr.avif";
 
@@ -196,6 +196,7 @@ const SERVICE_LABELS = {
 
 export default function FormPage() {
   const { token } = useParams();
+  const navigate = useNavigate();
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -208,7 +209,12 @@ export default function FormPage() {
     async function fetchMeta() {
       try {
         const res = await fetch(`${API_BASE}/api/form/${token}`);
-        if (res.status === 410) { setError("already_submitted"); return; }
+        if (res.status === 410) {
+  const data = await res.json();
+  if (data.message === "Link expired.") { setError("expired"); return; }
+  setError("already_submitted");
+  return;
+}
         if (!res.ok) { setError("invalid"); return; }
         const data = await res.json();
         setMeta(data);
@@ -240,6 +246,7 @@ export default function FormPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Submission failed.");
       setSubmitted(true);
+      navigate(`/receipt/${token}`);
     } catch (err) {
       setFormError(err.message);
     } finally {
@@ -268,6 +275,16 @@ export default function FormPage() {
       </div>
     );
   }
+  if (error === "expired") {
+  return (
+    <div className="min-h-screen bg-[#f8f6f2] flex items-center justify-center px-4">
+      <div className="bg-white border border-[#e4dfd4] rounded-xl p-8 max-w-md text-center">
+        <h2 className="font-serif text-xl font-semibold mb-2 text-[#8c4a4a]">Link expired</h2>
+        <p className="text-sm text-[#5a6270]">This form link has expired (valid for 45 days). Please contact the accounts section.</p>
+      </div>
+    </div>
+  );
+}
 
   if (error) {
     return (
