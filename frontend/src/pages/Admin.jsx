@@ -139,7 +139,7 @@ export default function AdminDashboard() {
               <img src={asssrLogo} alt="ASSSR Logo" className="w-full h-full object-contain" />
             </div>
           </div>
-          <span className="font-serif text-2xl font-bold tracking-wide text-white">AFMS</span>
+          <span className="text-2xl font-bold tracking-wide text-white" style={{ fontFamily: "Tahoma, Geneva, sans-serif" }}>AFMS</span>
           <span className="text-[11px] text-white/50">Finance Department</span>
         </div>
 

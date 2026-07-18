@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logomain.avif";
 import asssrLogo from "../assets/asssr.avif";
+import headerImg from "../assets/header.png";
 
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
 
@@ -42,26 +43,15 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 font-sans" style={{ background: "#f4f2ed" }}>
+    <div className="min-h-screen flex flex-col font-sans" style={{ background: "#f4f2ed" }}>
+      {/* ── Top Header Image ── */}
+      <header className="bg-white border-b w-full shrink-0 flex justify-center" style={{ borderColor: "#dde3ec" }}>
+        <img src={headerImg} alt="AFMS Header" className="w-full max-h-32 object-contain py-2" />
+      </header>
 
-      {/* Logo / wordmark */}
-      <div className="mb-10 text-center flex flex-col items-center">
-        <div className="flex gap-4 mb-4">
-          <div className="inline-flex items-center justify-center w-24 h-24">
-            <img src={logo} alt="AFMS Logo" className="w-full h-full object-contain" />
-          </div>
-          <div className="inline-flex items-center justify-center w-24 h-24">
-            <img src={asssrLogo} alt="ASSSR Logo" className="w-full h-full object-contain" />
-          </div>
-        </div>
-        <h1 className="font-serif text-3xl font-bold tracking-tight" style={{ color: DB }}>AFMS 2026</h1>
-        <p className="text-sm mt-1" style={{ color: "#8899aa", fontFamily: "Tahoma, Geneva, sans-serif" }}>
-          Financial Management System
-        </p>
-      </div>
-
-      {/* Card */}
-      <div className="w-full max-w-sm bg-white rounded-2xl border shadow-sm overflow-hidden" style={{ borderColor: "#dde3ec" }}>
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+        {/* Card */}
+        <div className="w-full max-w-sm bg-white rounded-2xl border shadow-sm overflow-hidden" style={{ borderColor: "#dde3ec" }}>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-7 space-y-5">
@@ -168,9 +158,10 @@ export default function Login() {
         </form>
       </div>
 
-      <p className="mt-6 text-xs text-center" style={{ color: "#bbc", fontFamily: "Tahoma, Geneva, sans-serif" }}>
-        AFMS 2026 · Internal use only
-      </p>
+        <p className="text-center text-xs mt-10" style={{ color: "#8899aa", fontFamily: "Tahoma, Geneva, sans-serif" }}>
+          AFMS · Internal use only
+        </p>
+      </div>
     </div>
   );
 }

@@ -79,7 +79,7 @@ export default function Registrar() {
             </div>
           </div>
           <div>
-            <span className="font-serif text-lg font-bold" style={{ color: DB }}>AFMS 2026</span>
+            <span className="text-lg font-bold" style={{ color: DB, fontFamily: "Tahoma, Geneva, sans-serif" }}>AFMS</span>
             <span className="hidden md:inline text-[#ccc] mx-2">·</span>
             <span className="hidden md:inline text-xs text-[#99a] uppercase tracking-widest">Registrar View</span>
           </div>
