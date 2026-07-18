@@ -20,6 +20,12 @@ const recordSchema = new mongoose.Schema(
 
     // Unique token for the form link sent to the user
     token: { type: String, default: uuidv4, unique: true },
+          receiptNumber: { type: String, default: null },
+          submittedIp: { type: String, default: null },
+         //recipt number
+     receiptNumber: { type: String, default: null },
+          // expiry to the Record model
+    expiresAt: { type: Date, default: () => new Date(Date.now() + 45 * 24 * 60 * 60 * 1000) },
 
     // Tracks whether the user submitted the form
     formSubmitted: { type: Boolean, default: false },

@@ -42,12 +42,10 @@ function Barcode({ value }) {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
-    // Simple Code 39 style barcode renderer
     const barWidth = 2;
     const barHeight = 50;
     const padding = 10;
 
-    // Convert value to binary pattern (simplified visual barcode)
     const chars = value.toUpperCase().split("");
     const pattern = chars.flatMap((c) => {
       const code = c.charCodeAt(0);
@@ -71,7 +69,6 @@ function Barcode({ value }) {
       ctx.fillRect(padding + i * barWidth, 0, barWidth, barHeight);
     });
 
-    // Label below barcode
     ctx.fillStyle = "#1b2430";
     ctx.font = "9px monospace";
     ctx.textAlign = "center";
@@ -132,7 +129,9 @@ export default function ReceiptPage() {
   const tds = gross - net;
   const formData = record.formData || {};
   const submittedAt = record.updatedAt || record.createdAt;
-  const utrn = record.token.split("-")[0].toUpperCase();
+
+  // Receipt number: service prefix + year + 4-digit seq, fallback to token
+  const utrn = record.receiptNumber || record.token.split("-")[0].toUpperCase();
 
   return (
     <div className="min-h-screen bg-[#f8f6f2] py-10 px-4 print:bg-white print:py-0">
@@ -217,7 +216,8 @@ export default function ReceiptPage() {
               {record.category} Receipt electronically transmitted on{" "}
               <strong>{formatDate(submittedAt)}</strong> at{" "}
               <strong>{formatTime(submittedAt)}</strong> for an amount of{" "}
-              <strong>₹ {formatAmount(net)}/-</strong> and verified by{" "}
+              <strong>₹ {formatAmount(net)}/-</strong> from IP address{" "}
+              <strong>{record.submittedIp || "0.0.0.0"}</strong> and verified by{" "}
               <strong>{record.name}</strong> having{" "}
               <strong>PAN ({formData.pan || "—"})</strong> using Electronic Verification Code{" "}
               <strong>{utrn}</strong> generated through Email / Mobile OTP mode.

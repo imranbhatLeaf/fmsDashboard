@@ -209,7 +209,12 @@ export default function FormPage() {
     async function fetchMeta() {
       try {
         const res = await fetch(`${API_BASE}/api/form/${token}`);
-        if (res.status === 410) { setError("already_submitted"); return; }
+        if (res.status === 410) {
+  const data = await res.json();
+  if (data.message === "Link expired.") { setError("expired"); return; }
+  setError("already_submitted");
+  return;
+}
         if (!res.ok) { setError("invalid"); return; }
         const data = await res.json();
         setMeta(data);
@@ -270,6 +275,16 @@ export default function FormPage() {
       </div>
     );
   }
+  if (error === "expired") {
+  return (
+    <div className="min-h-screen bg-[#f8f6f2] flex items-center justify-center px-4">
+      <div className="bg-white border border-[#e4dfd4] rounded-xl p-8 max-w-md text-center">
+        <h2 className="font-serif text-xl font-semibold mb-2 text-[#8c4a4a]">Link expired</h2>
+        <p className="text-sm text-[#5a6270]">This form link has expired (valid for 45 days). Please contact the accounts section.</p>
+      </div>
+    </div>
+  );
+}
 
   if (error) {
     return (
