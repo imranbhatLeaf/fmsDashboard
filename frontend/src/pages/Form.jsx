@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import logo from "../assets/logomain.avif";
-import asssrLogo from "../assets/asssr.avif";
+import asssrLogo from "../assets/asssrFav.avif";
 
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
 

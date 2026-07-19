@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logomain.avif";
-import asssrLogo from "../assets/asssr.avif";
+import asssrLogo from "../assets/asssrFav.avif";
+import headerImg from "../assets/header.png";
 
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
 
-const CATEGORIES = ["Salary", "Fellowship", "Honorarium", "Refund", "TA/DA"];
+const COMPONENTS = ["ASSSR", "JASSSR", "DHC", "VMI"];
 
 const DB = "#1b3358";
 
@@ -18,6 +19,7 @@ export default function Registrar() {
   const [records, setRecords]               = useState([]);
   const [loading, setLoading]               = useState(false);
   const [error, setError]                   = useState(null);
+  const [sortConfig, setSortConfig]         = useState({ key: null, direction: 'asc' });
 
   // Summary counts
   const [summary, setSummary] = useState({ total: 0, sent: 0, pending: 0, failed: 0 });
@@ -26,7 +28,7 @@ export default function Registrar() {
     setLoading(true);
     setError(null);
     try {
-      const query = activeCategory === "all" ? "" : `?category=${encodeURIComponent(activeCategory)}`;
+      const query = activeCategory === "all" ? "" : `?component=${encodeURIComponent(activeCategory)}`;
       const res = await fetch(`${API_BASE}/api/records${query}`);
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
@@ -62,10 +64,42 @@ export default function Registrar() {
     }
   }
 
+  async function handleDelete(id) {
+    if (!window.confirm("Are you sure you want to delete this record?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/records/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Deletion failed");
+      setRecords((prev) => prev.filter((r) => r._id !== id));
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+    setSortConfig({ key, direction });
+  };
+
+  const sortedRecords = [...records].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    
+    let aVal = sortConfig.key === 'year' ? new Date(a.createdAt || Date.now()).getFullYear() : a.services;
+    let bVal = sortConfig.key === 'year' ? new Date(b.createdAt || Date.now()).getFullYear() : b.services;
+    
+    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   const totalAmount = records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
 
   return (
-    <div className="min-h-screen font-sans" style={{ background: "#f4f2ed", color: "#1b2230" }}>
+    <div className="min-h-screen font-sans flex flex-col" style={{ background: "#f4f2ed", color: "#1b2230" }}>
+      {/* ── Top Header Image ── */}
+      <header className="bg-white border-b w-full shrink-0 flex justify-center" style={{ borderColor: "#dde3ec" }}>
+        <img src={headerImg} alt="AFMS Header" className="w-full max-h-32 object-contain py-2" />
+      </header>
 
       {/* ── Top nav ── */}
       <header className="bg-white border-b px-6 md:px-10 py-4 flex items-center justify-between" style={{ borderColor: "#dde3ec" }}>
@@ -140,7 +174,7 @@ export default function Registrar() {
 
         {/* Category filter tabs */}
         <div className="flex gap-2 flex-wrap mb-5">
-          {["all", ...CATEGORIES].map((cat) => (
+          {["all", ...COMPONENTS].map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
@@ -168,6 +202,23 @@ export default function Registrar() {
           ))}
         </div>
 
+        {/* Sort controls */}
+        <div className="flex gap-2 mb-4">
+          <span className="text-sm text-[#556] mr-2">Sort by:</span>
+          <button 
+            onClick={() => handleSort('services')} 
+            className="text-xs px-3 py-1 rounded border hover:bg-gray-50 transition-colors"
+          >
+            Component {sortConfig.key === 'services' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+          </button>
+          <button 
+            onClick={() => handleSort('year')} 
+            className="text-xs px-3 py-1 rounded border hover:bg-gray-50 transition-colors"
+          >
+            Year {sortConfig.key === 'year' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+          </button>
+        </div>
+
         {/* Table */}
         {loading && <p className="text-sm" style={{ color: "#aab" }}>Loading transactions…</p>}
         {error && (
@@ -177,15 +228,15 @@ export default function Registrar() {
           <p className="text-sm" style={{ color: "#aab" }}>No transactions found for this category.</p>
         )}
         {!loading && !error && records.length > 0 && (
-          <div className="rounded-xl border overflow-hidden bg-white" style={{ borderColor: "#dde3ec" }}>
-            <table className="w-full border-collapse text-sm">
+          <div className="rounded-xl border overflow-x-auto bg-white shadow-sm" style={{ borderColor: "#dde3ec" }}>
+            <table className="w-full border-collapse text-sm whitespace-nowrap">
               <thead>
                 <tr>
                   {["Name", "Email", "Amount", "After TDS", "Payment Type", "Component", "Status", "Action"].map((h) => (
                     <th
                       key={h}
-                      className={`text-[10px] uppercase tracking-widest px-4 py-3 border-b font-semibold ${(h === "Amount" || h === "After TDS") ? "text-right" : "text-left"}`}
-                      style={{ color: "#7a8baa", borderColor: "#dde3ec", background: "#f5f7fb" }}
+                      className={`text-[11px] uppercase tracking-widest px-5 py-4 border-b font-bold ${(h === "Amount" || h === "After TDS") ? "text-right" : "text-left"}`}
+                      style={{ color: "#64748b", borderColor: "#dde3ec", background: "#f8fafc" }}
                     >
                       {h}
                     </th>
@@ -193,7 +244,7 @@ export default function Registrar() {
                 </tr>
               </thead>
               <tbody>
-                {records.map((r) => {
+                {sortedRecords.map((r) => {
                   let status = "Form Pending";
                   if (r.formSubmitted) status = "Needs Approval";
                   if (r.registrarApproved) status = "Approved";
@@ -206,42 +257,50 @@ export default function Registrar() {
                       onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f7fb")}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "")}
                     >
-                      <td className="px-4 py-3 border-b font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>{r.name}</td>
-                      <td className="px-4 py-3 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.email}</td>
-                      <td className="px-4 py-3 border-b text-right font-mono tabular-nums font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>
+                      <td className="px-5 py-4 border-b font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>{r.name}</td>
+                      <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.email}</td>
+                      <td className="px-5 py-4 border-b text-right font-mono tabular-nums font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>
                         ₹{Number(r.amount).toLocaleString("en-IN")}
                       </td>
-                      <td className="px-4 py-3 border-b text-right font-mono tabular-nums font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>
-                        ₹{r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString("en-IN") : Number(r.amount * 0.9).toLocaleString("en-IN")}
+                      <td className="px-5 py-4 border-b text-right font-mono tabular-nums font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>
+                        ₹{r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString("en-IN") : (r.category === "Refund" || r.category === "TA/DA" ? Number(r.amount).toLocaleString("en-IN") : Number(r.amount * 0.9).toLocaleString("en-IN"))}
                       </td>
-                      <td className="px-4 py-3 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.category}</td>
-                      <td className="px-4 py-3 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.services}</td>
-                      <td className="px-4 py-3 border-b" style={{ borderColor: "#edf0f7" }}>
+                      <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.category}</td>
+                      <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.services}</td>
+                      <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7" }}>
                         <span
-                          className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full border"
+                          className="inline-block text-xs font-semibold px-3 py-1 rounded-full border"
                           style={
                             status === "Approved" || status === "Paid"
-                              ? { background: "#e6f4ea", color: "#137333", borderColor: "#ceead6" }
+                              ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
                               : status === "Needs Approval"
-                              ? { background: "#fef7e0", color: "#b06000", borderColor: "#feefc3" }
-                              : { background: "#fff", color: "#99a", borderColor: "#e0e4ee" }
+                              ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
+                              : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
                           }
                         >
                           {status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 border-b" style={{ borderColor: "#edf0f7" }}>
-                        {status === "Needs Approval" && (
+                      <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7" }}>
+                        <div className="flex items-center gap-2">
+                          {status === "Needs Approval" && (
+                            <button
+                              onClick={() => handleApprove(r._id)}
+                              className="text-[10px] font-bold uppercase tracking-wider text-white px-3 py-1.5 rounded-md transition-colors"
+                              style={{ background: DB }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = "#152849")}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = DB)}
+                            >
+                              Approve
+                            </button>
+                          )}
                           <button
-                            onClick={() => handleApprove(r._id)}
-                            className="text-[10px] font-bold uppercase tracking-wider text-white px-3 py-1.5 rounded-md transition-colors"
-                            style={{ background: DB }}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = "#152849")}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = DB)}
+                            onClick={() => handleDelete(r._id)}
+                            className="text-[10px] font-bold uppercase tracking-wider text-red-600 px-3 py-1.5 rounded-md border border-red-200 transition-colors hover:bg-red-50"
                           >
-                            Approve
+                            Delete
                           </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   );

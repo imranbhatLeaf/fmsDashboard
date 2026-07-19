@@ -2,17 +2,18 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logomain.avif";
-import asssrLogo from "../assets/asssr.avif";
+import asssrLogo from "../assets/asssrFav.avif";
+import headerImg from "../assets/header.png";
 
 // Point this at your Express backend. In Vite, set VITE_API_BASE in your .env file.
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
 
-const CATEGORIES = [
+const PAYMENT_TYPES = [
+  { key: "Honorarium" },
   { key: "Salary" },
   { key: "Fellowship" },
-  { key: "Honorarium" },
-  { key: "Refund" },
   { key: "TA/DA" },
+  { key: "Refund" },
 ];
 
 // Dark blue palette
@@ -38,6 +39,18 @@ export default function AdminDashboard() {
       alert(err.message);
     }
   }
+
+  async function handleDelete(id) {
+    if (!window.confirm("Are you sure you want to delete this record?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/records/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Deletion failed");
+      setRecords((prev) => prev.filter((r) => r._id !== id));
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
 
   // "upload" shows the CSV upload screen; otherwise this holds "all" or a category key
   const [view, setView] = useState("upload");
@@ -123,7 +136,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen font-sans" style={{ background: "#f4f2ed" }}>
-
       {/* ── Sidebar ── */}
       <aside
         className="w-full md:w-56 flex-shrink-0 flex flex-row md:flex-col gap-4 md:gap-6 p-4 md:p-6 overflow-x-auto md:overflow-visible"
@@ -131,14 +143,6 @@ export default function AdminDashboard() {
       >
         {/* Brand */}
         <div className="flex flex-col gap-0.5 px-1 md:pb-5 border-b-0 md:border-b border-white/15 shrink-0">
-          <div className="flex gap-2 mb-2">
-            <div className="w-12 h-12 flex items-center justify-center">
-              <img src={logo} alt="AFMS Logo" className="w-full h-full object-contain" />
-            </div>
-            <div className="w-12 h-12 flex items-center justify-center">
-              <img src={asssrLogo} alt="ASSSR Logo" className="w-full h-full object-contain" />
-            </div>
-          </div>
           <span className="text-2xl font-bold tracking-wide text-white" style={{ fontFamily: "Tahoma, Geneva, sans-serif" }}>AFMS</span>
           <span className="text-[11px] text-white/50">Finance Department</span>
         </div>
@@ -169,7 +173,7 @@ export default function AdminDashboard() {
             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-current opacity-60" />
             Financial Records
           </button>
-          {CATEGORIES.map((cat) => (
+          {PAYMENT_TYPES.map((cat) => (
             <button
               key={cat.key}
               className={navItemClasses(view === cat.key)}
@@ -202,7 +206,12 @@ export default function AdminDashboard() {
       </aside>
 
       {/* ── Main content ── */}
-      <main className="flex-1 p-6 md:p-10 md:px-12 max-w-[980px]">
+      <div className="flex-1 flex flex-col">
+        {/* ── Top Header Image ── */}
+        <header className="bg-white border-b w-full shrink-0 flex justify-center" style={{ borderColor: "#dde3ec" }}>
+          <img src={headerImg} alt="AFMS Header" className="w-full max-h-32 object-contain py-2" />
+        </header>
+        <main className="flex-1 p-6 md:p-10 md:px-12 max-w-[980px]">
 
         {view === "upload" ? (
           /* ── Upload Entry view ── */
@@ -314,17 +323,17 @@ export default function AdminDashboard() {
             )}
 
             {!recordsLoading && !recordsError && records.length > 0 && (
-              <div className="rounded-lg border overflow-hidden bg-white" style={{ borderColor: "#dde3ec" }}>
-                <table className="w-full border-collapse text-sm">
+              <div className="rounded-xl border overflow-x-auto bg-white shadow-sm" style={{ borderColor: "#dde3ec" }}>
+                <table className="w-full border-collapse text-sm whitespace-nowrap">
                   <thead>
                     <tr>
                       {["Name", "Email", "Amount", "After TDS", "Payment Type", "Component", "Status", "Action"].map((h) => (
                         <th
                           key={h}
-                          className={`text-[10px] uppercase tracking-widest px-4 py-3 border-b font-semibold ${
+                          className={`text-[11px] uppercase tracking-widest px-5 py-4 border-b font-bold ${
                             (h === "Amount" || h === "After TDS") ? "text-right" : "text-left"
                           }`}
-                          style={{ color: "#7a8baa", borderColor: "#dde3ec", background: "#f5f7fb" }}
+                          style={{ color: "#64748b", borderColor: "#dde3ec", background: "#f8fafc" }}
                         >
                           {h}
                         </th>
@@ -345,42 +354,59 @@ export default function AdminDashboard() {
                         onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f7fb")}
                         onMouseLeave={(e) => (e.currentTarget.style.background = "")}
                       >
-                        <td className="px-4 py-3 border-b font-medium" style={{ borderColor: "#edf0f7", color: DB }}>{r.name}</td>
-                        <td className="px-4 py-3 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.email}</td>
-                        <td className="px-4 py-3 border-b text-right font-mono tabular-nums font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>
+                        <td className="px-5 py-4 border-b font-medium" style={{ borderColor: "#edf0f7", color: DB }}>{r.name}</td>
+                        <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.email}</td>
+                        <td className="px-5 py-4 border-b text-right font-mono tabular-nums font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>
                           {Number(r.amount).toLocaleString()}
                         </td>
-                        <td className="px-4 py-3 border-b text-right font-mono tabular-nums font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>
-                          {r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString() : Number(r.amount * 0.9).toLocaleString()}
+                        <td className="px-5 py-4 border-b text-right font-mono tabular-nums font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>
+                          {r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString() : (r.category === "Refund" || r.category === "TA/DA" ? Number(r.amount).toLocaleString() : Number(r.amount * 0.9).toLocaleString())}
                         </td>
-                        <td className="px-4 py-3 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.category}</td>
-                        <td className="px-4 py-3 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.services}</td>
-                        <td className="px-4 py-3 border-b" style={{ borderColor: "#edf0f7" }}>
+                        <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.category}</td>
+                        <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.services}</td>
+                        <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7" }}>
                           <span
-                            className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full border"
+                            className="inline-block text-xs font-semibold px-3 py-1 rounded-full border"
                             style={
                               status === "Paid"
-                                ? { background: "#e6f4ea", color: "#137333", borderColor: "#ceead6" }
+                                ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
                                 : status === "Ready for Payment"
-                                ? { background: "#e8eef7", color: DB, borderColor: "#c5d0e8" }
-                                : { background: "#fff", color: "#99a", borderColor: "#e0e4ee" }
+                                ? { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
+                                : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
                             }
                           >
                             {status}
                           </span>
                         </td>
-                        <td className="px-4 py-3 border-b" style={{ borderColor: "#edf0f7" }}>
-                          {status === "Ready for Payment" && (
+                        <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7" }}>
+                          <div className="flex items-center gap-2">
+                            {status === "Paid" ? (
+                              <button
+                                onClick={() => window.open(`/receipt/${r.token}`, '_blank')}
+                                className="text-[10px] font-bold uppercase tracking-wider text-white px-3 py-1.5 rounded-md transition-colors bg-green-600 hover:bg-green-700 shadow-sm"
+                              >
+                                View / Download Receipt
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => status === "Ready for Payment" && handleProcess(r._id)}
+                                disabled={status !== "Ready for Payment"}
+                                className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-md transition-all duration-200 ${
+                                  status === "Ready for Payment"
+                                    ? "bg-green-600 text-white hover:bg-green-700 shadow-sm shadow-green-200 cursor-pointer"
+                                    : "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed"
+                                }`}
+                              >
+                                Approve & Generate Receipt
+                              </button>
+                            )}
                             <button
-                              onClick={() => handleProcess(r._id)}
-                              className="text-[10px] font-bold uppercase tracking-wider text-white px-3 py-1.5 rounded-md transition-colors"
-                              style={{ background: DB }}
-                              onMouseEnter={(e) => (e.currentTarget.style.background = "#152849")}
-                              onMouseLeave={(e) => (e.currentTarget.style.background = DB)}
+                              onClick={() => handleDelete(r._id)}
+                              className="text-[10px] font-bold uppercase tracking-wider text-red-600 px-3 py-1.5 rounded-md border border-red-200 transition-colors hover:bg-red-50"
                             >
-                              Process
+                              Delete
                             </button>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     )})}
@@ -390,7 +416,8 @@ export default function AdminDashboard() {
             )}
           </section>
         )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

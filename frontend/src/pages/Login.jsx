@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logomain.avif";
-import asssrLogo from "../assets/asssr.avif";
+import asssrLogo from "../assets/asssrFav.avif";
 import headerImg from "../assets/header.png";
 
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
