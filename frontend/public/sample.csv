@@ -1,4 +1,1 @@
-name,email,amount,category,services
-John Doe,johndoe@example.com,5000,Honorarium,ASSSR
-Jane Smith,janesmith@example.com,3000,Salary,VMI
-Alice Johnson,alicej@example.com,1000,TA/DA,DHC
+row_id,component,form_type,name,designation,pay_level,address,phone_office,phone_mobile,email,programme_nature,programme_title,participation_type,lecture_type,honorarium_basis,num_presences,rate,total_amount,journey_from,journey_to,journey_mode,journey_amount,local_journey_from,local_journey_to,local_journey_mode,local_journey_amount,grand_total,fellowship_rate,fellowship_total,refund_amount_claimed,payment_receipt_number,payment_receipt_date,refund_reason,academic_year,payee_status,payee_link_token,pan_number,aadhaar_number,beneficiary_name,account_number,bank_name,ifsc_code,bank_branch_address

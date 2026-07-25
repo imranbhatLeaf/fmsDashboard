@@ -1,1 +1,9 @@
 @import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: Tahoma, sans-serif;
+    background-color: #FAF9F6;
+    color: black;
+  }
+}

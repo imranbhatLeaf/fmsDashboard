@@ -7,8 +7,8 @@ import headerImg from "../assets/header.png";
 
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
 
-const DB = "#1b3358";
-const DB_HOVER = "#152849";
+const DB = "black";
+const DB_HOVER = "#333";
 
 export default function Login() {
   const { login } = useAuth();
@@ -43,7 +43,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-sans" style={{ background: "#f4f2ed" }}>
+    <div className="min-h-screen flex flex-col font-sans" style={{ background: "#FAF9F6" }}>
       {/* ── Top Header Image ── */}
       <header className="bg-white border-b w-full shrink-0 flex justify-center" style={{ borderColor: "#dde3ec" }}>
         <img src={headerImg} alt="AFMS Header" className="w-full max-h-32 object-contain py-2" />

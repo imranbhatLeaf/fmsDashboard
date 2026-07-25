@@ -7,19 +7,20 @@ import Admin from './pages/Admin'
 import Registrar from './pages/Registrar'
 import Form from './pages/Form'
 import Receipt from './pages/Receipt'
+import Home from './pages/Home'
 // inside Routes:
 const App = () => {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Default → login */}
-          <Route path='/' element={<Navigate to='/login' replace />} />
+          {/* Default → Home */}
+          <Route path='/' element={<Home />} />
 
           {/* Public */}
           <Route path='/login' element={<Login />} />
           <Route path='/form/:token' element={<Form />} />
-          <Route path='/form/:token' element={<Form />} />
+          <Route path='/complete/:token' element={<Form />} />
           <Route path='/receipt/:token' element={<Receipt />} />
 
           {/* Protected */}

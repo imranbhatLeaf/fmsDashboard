@@ -72,7 +72,7 @@ function Barcode({ value }) {
     ctx.fillStyle = "#1b2430";
     ctx.font = "9px monospace";
     ctx.textAlign = "center";
-    ctx.fillText(`AFMS-${value}`, totalWidth / 2, barHeight + 14);
+    ctx.fillText(`${value}`, totalWidth / 2, barHeight + 14);
   }, [value]);
 
   return (
@@ -134,113 +134,99 @@ export default function ReceiptPage() {
   const utrn = record.receiptNumber || record.token.split("-")[0].toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#f8f6f2] py-10 px-4 print:bg-white print:py-0">
+    <div className="min-h-screen bg-white py-10 px-4">
       {/* Print button */}
       <div className="max-w-3xl mx-auto mb-4 flex justify-end print:hidden">
         <button
           onClick={() => window.print()}
-          className="bg-[#15243d] text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-[#1f3354] transition-colors"
+          className="bg-black text-white text-sm font-semibold px-5 py-2.5 hover:bg-gray-800 transition-colors"
         >
           Print / Save PDF
         </button>
       </div>
 
       {/* Receipt */}
-      <div className="max-w-3xl mx-auto bg-white border border-[#e4dfd4] rounded-xl overflow-hidden print:border print:rounded-none print:shadow-none">
+      <div className="max-w-3xl mx-auto bg-white border border-black p-8">
         {/* Header */}
-        <div className="bg-[#15243d] text-white px-8 py-5 flex justify-between items-start">
-          <div>
-            <p className="text-xs uppercase tracking-widest text-white/50 mb-0.5">{record.services}</p>
-            <h1 className="font-serif text-lg font-semibold">{SERVICE_FULL[record.services]}</h1>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-white/50 uppercase tracking-wider">Financial Year</p>
-            <p className="text-sm font-semibold">{getCurrentFY()}</p>
-          </div>
+        <div className="text-center mb-6 border-b border-black pb-4">
+          <h1 className="font-bold text-xl">{SERVICE_FULL[record.services]}</h1>
+          <p className="text-sm font-semibold mt-1">Financial Year: {getCurrentFY()}</p>
         </div>
 
         {/* Receipt title */}
-        <div className="border-b border-[#e4dfd4] px-8 py-4 flex justify-between items-center bg-[#fbfaf7]">
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <p className="text-xs uppercase tracking-widest text-[#5a6270]">
-              {record.category} Receipt
-            </p>
-            <p className="text-[11px] text-[#5a6270]">For Record Purposes Against Payments Made</p>
+            <p className="font-bold">{record.category} Receipt</p>
+            <p className="text-sm">For Record Purposes Against Payments Made</p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-[#5a6270] uppercase tracking-wider">AFMS-UTRN</p>
-            <p className="font-mono text-sm font-semibold text-[#1b2430]">{utrn}</p>
+            <p className="text-sm font-bold">Unique Transaction Reference Number (UTRN)</p>
+            <p className="font-mono">{utrn}</p>
           </div>
         </div>
 
-        <div className="px-8 py-6">
-          {/* Main details */}
-          <table className="w-full text-sm border border-[#e4dfd4] rounded-lg overflow-hidden">
-            <tbody>
-              <Row label="Date of Transfer" value={formatDate(submittedAt)} />
-              <Row label="Name of Claimant / Payee" value={record.name} />
-              <Row label="Bank" value={formData.bankName || "—"} />
-              <Row label="Account Number" value={formData.bankAccountNumber || "—"} />
-              <Row label="IFSC" value={formData.bankIfsc || "—"} />
-              <Row label="Payment Type" value={record.category} />
-              <Row label="Bank Reference No." value="—" />
-              <Row label="Component" value={record.services} />
-            </tbody>
-          </table>
+        {/* Main details */}
+        <table className="w-full text-sm border-collapse border border-black mb-6">
+          <tbody>
+            <Row label="Date of Transfer" value={formatDate(record.dateOfTransfer || record.paymentProcessedAt)} />
+            <Row label="Name of Claimant / Payee" value={record.name} />
+            <Row label="Bank" value={formData.bankName || "—"} />
+            <Row label="Account Number" value={formData.bankAccountNumber || "—"} />
+            <Row label="Indian Financial System Code (IFSC)" value={formData.bankIfsc || "—"} />
+            <Row label="Payment Type" value={record.category} />
+            <Row label="Bank Reference No." value={record.bankReferenceNo || "—"} />
+            <Row label="Component" value={record.services} />
+          </tbody>
+        </table>
 
-          {/* Settlement */}
-          <table className="w-full text-sm border border-[#e4dfd4] rounded-lg overflow-hidden mt-4">
-            <tbody>
-              <tr className="border-b border-[#e4dfd4]">
-                <td className="px-4 py-2.5 text-[#5a6270] w-32">Settlement</td>
-                <td className="px-4 py-2.5 text-[#5a6270]">Gross Amount</td>
-                <td className="px-4 py-2.5 text-right font-mono">₹ {formatAmount(gross)}</td>
-              </tr>
-              <tr className="border-b border-[#e4dfd4]">
-                <td className="px-4 py-2.5"></td>
-                <td className="px-4 py-2.5 text-[#5a6270]">Less: TDS (if applicable)</td>
-                <td className="px-4 py-2.5 text-right font-mono text-[#8c4a4a]">₹ {formatAmount(tds)}</td>
-              </tr>
-              <tr className="bg-[#fbfaf7]">
-                <td className="px-4 py-2.5"></td>
-                <td className="px-4 py-2.5 font-semibold text-[#1b2430]">Net Amount Payable</td>
-                <td className="px-4 py-2.5 text-right font-mono font-semibold text-[#1b2430]">₹ {formatAmount(net)}</td>
-              </tr>
-            </tbody>
-          </table>
+        {/* Settlement */}
+        <div className="mb-2 font-bold text-sm">Settlement Details</div>
+        <table className="w-full text-sm border-collapse border border-black mb-6">
+          <tbody>
+            <tr>
+              <td className="px-4 py-2 border border-black font-bold w-48">Gross Amount</td>
+              <td className="px-4 py-2 border border-black text-right">₹ {formatAmount(gross)}</td>
+            </tr>
+            <tr>
+              <td className="px-4 py-2 border border-black font-bold">Less: Tax Deducted at Source (TDS)</td>
+              <td className="px-4 py-2 border border-black text-right">₹ {formatAmount(tds)}</td>
+            </tr>
+            <tr>
+              <td className="px-4 py-2 border border-black font-bold">Net Amount Payable</td>
+              <td className="px-4 py-2 border border-black text-right font-bold">₹ {formatAmount(net)}</td>
+            </tr>
+          </tbody>
+        </table>
 
-          {/* Verification */}
-          <div className="mt-6 border border-[#e4dfd4] rounded-lg p-4 bg-[#fbfaf7]">
-            <p className="text-[11px] uppercase tracking-widest text-[#5a6270] font-semibold mb-2">Verification</p>
-            <p className="text-xs text-[#1b2430] leading-relaxed">
-              {record.category} Receipt electronically transmitted on{" "}
-              <strong>{formatDate(submittedAt)}</strong> at{" "}
-              <strong>{formatTime(submittedAt)}</strong> for an amount of{" "}
-              <strong>₹ {formatAmount(net)}/-</strong> from IP address{" "}
-              <strong>{record.submittedIp || "0.0.0.0"}</strong> and verified by{" "}
-              <strong>{record.name}</strong> having{" "}
-              <strong>PAN ({formData.pan || "—"})</strong> using Electronic Verification Code{" "}
-              <strong>{utrn}</strong> generated through Email / Mobile OTP mode.
-            </p>
-          </div>
+        {/* Dates */}
+        <div className="mb-6 p-4 border border-black text-sm">
+          <p className="font-bold mb-2">Processing Dates:</p>
+          <ul className="list-disc pl-5">
+            <li><strong>Date of Entry:</strong> {formatDate(record.createdAt)}</li>
+            <li><strong>Date of Upload:</strong> {formatDate(record.updatedAt)}</li>
+            <li><strong>Date of Forwarding:</strong> {formatDate(record.adminApprovedAt)}</li>
+            <li><strong>Date of Approval:</strong> {formatDate(record.registrarApprovedAt)}</li>
+          </ul>
+        </div>
 
-          {/* Barcode section */}
-          <div className="mt-6 border border-[#e4dfd4] rounded-lg p-4 flex justify-between items-center">
-            <div>
-              <p className="text-[11px] uppercase tracking-widest text-[#5a6270] font-semibold mb-2">System Generated</p>
-              <Barcode value={utrn} />
-            </div>
-            <div className="text-right">
-              <p className="text-[11px] uppercase tracking-widest text-[#5a6270] font-semibold mb-1">AFMS-UTRN</p>
-              <p className="font-mono text-lg font-bold text-[#1b2430]">{utrn}</p>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <p className="mt-4 text-center text-[11px] text-[#5a6270] border-t border-[#e4dfd4] pt-4">
-            This document has been generated electronically and is valid without a physical signature.
+        <div className="mb-6 border border-black p-4 text-sm">
+          <p className="font-bold mb-2">Verification</p>
+          <p className="leading-relaxed">
+            {record.category} Receipt electronically transmitted on{" "}
+            <strong>{formatDate(submittedAt)}</strong> at{" "}
+            <strong>{formatTime(submittedAt)}</strong> for an amount of{" "}
+            <strong>₹ {formatAmount(net)}/-</strong> from IP address{" "}
+            <strong>{record.submittedIp?.split(",")[0]?.trim() || "0.0.0.0"}</strong> and verified by{" "}
+            <strong>{record.name}</strong> having{" "}
+            <strong>Permanent Account Number (PAN) ({formData.pan || "—"})</strong> using Electronic Verification Code{" "}
+            <strong>{utrn}</strong> generated through Email / Mobile OTP mode.
           </p>
         </div>
+
+        {/* Footer */}
+        <p className="text-center text-xs border-t border-black pt-4">
+          This document has been generated electronically and is valid without a physical signature.
+        </p>
       </div>
     </div>
   );
@@ -248,9 +234,9 @@ export default function ReceiptPage() {
 
 function Row({ label, value }) {
   return (
-    <tr className="border-b border-[#e4dfd4] last:border-b-0">
-      <td className="px-4 py-2.5 text-[#5a6270] w-48 bg-[#fbfaf7] text-xs uppercase tracking-wide">{label}</td>
-      <td className="px-4 py-2.5 text-[#1b2430] font-medium">{value}</td>
+    <tr>
+      <td className="px-4 py-2 border border-black font-bold w-48">{label}</td>
+      <td className="px-4 py-2 border border-black">{value}</td>
     </tr>
   );
 }

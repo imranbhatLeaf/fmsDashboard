@@ -29,34 +29,58 @@ function getBody(doc) {
     case "Fellowship":
       return `Dear ${name},\n\nYour fellowship from ${service} has been processed.\n\nAmount: ₹${amount}\nTDS (10%): ₹${tds}\nNet: ₹${net}\n\nPlease fill your details here:\n${formLink}\n\n${footer}`;
     case "TA/DA":
-      return `Dear ${name},\n\nYour TA/DA reimbursement from ${service} has been approved.\n\nAmount: ₹${amount}\nTDS (10%): ₹${tds}\nNet: ₹${net}\n\nPlease fill your details here:\n${formLink}\n\n${footer}`;
+      return `Dear ${name},\n\nYour TA/DA reimbursement from ${service} has been approved.\n\nAmount: ₹${amount}\nTDS: ₹${tds}\nNet: ₹${net}\n\nPlease fill your details here:\n${formLink}\n\n${footer}`;
     case "Refund":
-      return `Dear ${name},\n\nA refund has been processed by ${service}.\n\nAmount: ₹${amount}\nTDS (10%): ₹${tds}\nNet: ₹${net}\n\nPlease fill your details here:\n${formLink}\n\n${footer}`;
+      return `Dear ${name},\n\nA refund has been processed by ${service}.\n\nAmount: ₹${amount}\nTDS: ₹${tds}\nNet: ₹${net}\n\nPlease fill your details here:\n${formLink}\n\n${footer}`;
     default:
       return `Dear ${name},\n\nA payment of ₹${net} has been processed by ${service}.\n\nPlease fill your details here:\n${formLink}\n\n${footer}`;
   }
 }
 
 async function sendEmail(doc) {
+  const fromEmail = process.env.RESEND_FROM || "onboarding@resend.dev";
+  const from = `${doc.services} Finance <${fromEmail}>`;
+  const subject = getSubject(doc);
+  const text = getBody(doc);
+
+  if (!process.env.RESEND_API_KEY || process.env.RESEND_API_KEY === "test" || process.env.RESEND_API_KEY === "") {
+    console.log("----------------------------------------");
+    console.log("[DEV MODE] Resend API Key is missing. Simulating Email Delivery.");
+    console.log(`From: ${from}`);
+    console.log(`To: ${doc.email}`);
+    console.log(`Subject: ${subject}`);
+    console.log(`Body:\n${text}`);
+    console.log("----------------------------------------");
+    return Promise.resolve("Simulated email delivery successfully");
+  }
+
   const body = JSON.stringify({
-    sender: { name: `${doc.services} Finance`, email: process.env.SMTP_USER },
-    to: [{ email: doc.email, name: doc.name }],
-    subject: getSubject(doc),
-    textContent: getBody(doc),
+    from,
+    to: [doc.email],
+    subject,
+    text,
   });
 
   return new Promise((resolve, reject) => {
     const req = https.request({
-      hostname: "api.brevo.com",
-      path: "/v3/smtp/email",
+      hostname: "api.resend.com",
+      path: "/emails",
       method: "POST",
+      family: 4,
       headers: {
         "Content-Type": "application/json",
-        "api-key": process.env.BREVO_API_KEY,
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`
       },
     }, (res) => {
-      res.on("data", () => {});
-      res.on("end", resolve);
+      let responseBody = "";
+      res.on("data", (chunk) => { responseBody += chunk; });
+      res.on("end", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(responseBody);
+        } else {
+          reject(new Error(`Resend API error (${res.statusCode}): ${responseBody}`));
+        }
+      });
     });
     req.on("error", reject);
     req.write(body);

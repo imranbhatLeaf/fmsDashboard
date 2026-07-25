@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logomain.avif";
 import asssrLogo from "../assets/asssrFav.avif";
 import headerImg from "../assets/header.png";
+import RecordModal from "../components/RecordModal";
 
 // Point this at your Express backend. In Vite, set VITE_API_BASE in your .env file.
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
@@ -16,10 +17,10 @@ const PAYMENT_TYPES = [
   { key: "Refund" },
 ];
 
-// Dark blue palette
-const DB = "#1b3358";          // dark blue
-const DB_HOVER = "#152849";    // darker on hover
-const DB_ACTIVE = "#243f6b";   // lighter blue for active nav item
+// Black palette
+const DB = "black";
+const DB_HOVER = "#333";
+const DB_ACTIVE = "#222";
 
 export default function AdminDashboard() {
   const { auth, logout } = useAuth();
@@ -30,25 +31,123 @@ export default function AdminDashboard() {
     navigate("/login");
   }
 
-  async function handleProcess(id) {
+  async function handleResetPassword() {
+    const newPassword = prompt("Enter new password (min 6 characters):");
+    if (!newPassword) return;
+    if (newPassword.length < 6) {
+      alert("Password must be at least 6 characters.");
+      return;
+    }
     try {
-      const res = await fetch(`${API_BASE}/api/records/${id}/process`, { method: "PUT" });
-      if (!res.ok) throw new Error("Processing failed");
-      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, paymentProcessed: true } : r));
+      const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth?.token}`
+        },
+        body: JSON.stringify({ newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to reset password.");
+      alert("Password reset successfully.");
     } catch (err) {
       alert(err.message);
     }
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm("Are you sure you want to delete this record?")) return;
+  async function handleAdminApprove(id) {
     try {
-      const res = await fetch(`${API_BASE}/api/records/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Deletion failed");
-      setRecords((prev) => prev.filter((r) => r._id !== id));
+      const res = await fetch(`${API_BASE}/api/records/${id}/admin-approve`, { method: "PUT" });
+      if (!res.ok) throw new Error("Approval failed");
+      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, adminApproved: true, adminApprovedAt: new Date() } : r));
     } catch (err) {
       alert(err.message);
     }
+  }
+
+  // Req 17: Process now requires bankReferenceNo and dateOfTransfer
+  async function handleProcess(id) {
+    setProcessRecordId(id);
+    setProcessBankRef("");
+    setProcessDateOfTransfer("");
+    setProcessError("");
+    setShowProcessModal(true);
+  }
+
+  async function submitProcess() {
+    if (!processBankRef.trim()) {
+      setProcessError("Bank Reference No. is required.");
+      return;
+    }
+    if (!processDateOfTransfer) {
+      setProcessError("Date of Transfer is required.");
+      return;
+    }
+    setProcessError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/records/${processRecordId}/process`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bankReferenceNo: processBankRef.trim(),
+          dateOfTransfer: processDateOfTransfer,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Processing failed");
+      setRecords((prev) => prev.map((r) => r._id === processRecordId ? {
+        ...r,
+        paymentProcessed: true,
+        paymentProcessedAt: new Date(),
+        bankReferenceNo: processBankRef.trim(),
+        dateOfTransfer: processDateOfTransfer,
+        receiptNumber: data.receiptNumber || r.receiptNumber,
+      } : r));
+      setShowProcessModal(false);
+    } catch (err) {
+      setProcessError(err.message);
+    }
+  }
+
+  function copyLink(token) {
+    const link = `${window.location.origin}/form/${token}`;
+    navigator.clipboard.writeText(link);
+    alert("Link copied!");
+  }
+
+  // Generic Add/Edit
+  const [showRecordModal, setShowRecordModal] = useState(false);
+  const [activeRecord, setActiveRecord] = useState(null);
+
+  function openAddModal() {
+    setActiveRecord(null);
+    setShowRecordModal(true);
+  }
+
+  function openRecordModal(record) {
+    setActiveRecord(record);
+    setShowRecordModal(true);
+  }
+
+  async function handleSaveRecord(formData) {
+    const isAdd = !activeRecord;
+    const url = isAdd ? `${API_BASE}/api/records` : `${API_BASE}/api/records/${activeRecord._id}/edit`;
+    const method = isAdd ? "POST" : "PUT";
+
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Failed to save record");
+    
+    if (isAdd) {
+      setRecords((prev) => [data, ...prev]);
+    } else {
+      setRecords((prev) => prev.map((r) => r._id === activeRecord._id ? data : r));
+    }
+    setShowRecordModal(false);
   }
 
 
@@ -65,6 +164,16 @@ export default function AdminDashboard() {
   const [records, setRecords] = useState([]);
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [recordsError, setRecordsError] = useState(null);
+  const [previewRecord, setPreviewRecord] = useState(null);
+
+  // Process modal state (Req 17)
+  const [showProcessModal, setShowProcessModal] = useState(false);
+  const [processRecordId, setProcessRecordId] = useState(null);
+  const [processBankRef, setProcessBankRef] = useState("");
+  const [processDateOfTransfer, setProcessDateOfTransfer] = useState("");
+  const [processError, setProcessError] = useState("");
+
+
 
   const fetchRecords = useCallback(async () => {
     if (view === "upload") return;
@@ -128,49 +237,42 @@ export default function AdminDashboard() {
   }
 
   const navItemClasses = (active) =>
-    `w-full flex items-center gap-2.5 text-left bg-transparent border-none text-sm px-3 py-2 rounded-md cursor-pointer whitespace-nowrap shrink-0 transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 focus-visible:outline-offset-2 ${
+    `flex items-center gap-2.5 text-left bg-transparent border-none text-sm px-3 py-2 rounded-md cursor-pointer whitespace-nowrap shrink-0 transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 focus-visible:outline-offset-2 ${
       active
         ? "bg-white/15 text-white font-semibold"
         : "text-white/65 hover:bg-white/10 hover:text-white"
     }`;
 
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString() : "-";
+
   return (
-    <div className="flex flex-col md:flex-row min-h-screen font-sans" style={{ background: "#f4f2ed" }}>
-      {/* ── Sidebar ── */}
-      <aside
-        className="w-full md:w-56 flex-shrink-0 flex flex-row md:flex-col gap-4 md:gap-6 p-4 md:p-6 overflow-x-auto md:overflow-visible"
+    <div className="flex flex-col min-h-screen font-sans" style={{ background: "#FAF9F6" }}>
+      {/* ── Topbar ── */}
+      <header
+        className="w-full flex-shrink-0 flex flex-row items-center gap-4 px-6 py-3 overflow-x-auto shadow-sm"
         style={{ background: DB, color: "#fff" }}
       >
         {/* Brand */}
-        <div className="flex flex-col gap-0.5 px-1 md:pb-5 border-b-0 md:border-b border-white/15 shrink-0">
-          <span className="text-2xl font-bold tracking-wide text-white" style={{ fontFamily: "Tahoma, Geneva, sans-serif" }}>AFMS</span>
-          <span className="text-[11px] text-white/50">Finance Department</span>
+        <div className="flex flex-col gap-0.5 px-2 border-r border-white/15 shrink-0 mr-4 pr-6">
+          <span className="text-xl font-bold tracking-wide text-white" style={{ fontFamily: "Tahoma, Geneva, sans-serif" }}>AFMS</span>
+          <span className="text-[10px] text-white/50">Admin Panel</span>
         </div>
 
-        {/* New Entry nav */}
-        <nav className="flex flex-row md:flex-col gap-0.5 shrink-0">
-          <span className="hidden md:block text-[10px] uppercase tracking-widest text-white/35 px-3 pb-1.5 pt-1">
-            New Entry
-          </span>
+        {/* Nav */}
+        <nav className="flex flex-row items-center gap-2 shrink-0 flex-1">
           <button
             className={navItemClasses(view === "upload")}
             onClick={() => setView("upload")}
           >
-            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-current opacity-60" />
             Upload Entry
           </button>
-        </nav>
+          
+          <div className="w-px h-6 bg-white/15 mx-2"></div>
 
-        {/* Transaction nav */}
-        <nav className="flex flex-row md:flex-col gap-0.5 shrink-0">
-          <span className="hidden md:block text-[10px] uppercase tracking-widest text-white/35 px-3 pb-1.5 pt-1">
-            Transaction
-          </span>
           <button
             className={navItemClasses(view === "all")}
             onClick={() => setView("all")}
           >
-            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-current opacity-60" />
             Financial Records
           </button>
           {PAYMENT_TYPES.map((cat) => (
@@ -179,39 +281,38 @@ export default function AdminDashboard() {
               className={navItemClasses(view === cat.key)}
               onClick={() => setView(cat.key)}
             >
-              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-current opacity-60" />
               {cat.key}
             </button>
           ))}
         </nav>
 
-        {/* Sign-out — pinned to bottom on desktop, inline on mobile */}
-        <div className="hidden md:flex flex-col mt-auto pt-4 border-t border-white/15 shrink-0">
-          <span className="text-[10px] text-white/40 mb-2 px-1">
+        {/* Sign-out */}
+        <div className="flex flex-row items-center gap-4 border-l border-white/15 pl-6 shrink-0">
+          <span className="text-[10px] text-white/40 hidden md:block">
             Signed in as <span className="text-white/80">{auth?.username}</span>
           </span>
           <button
+            onClick={handleResetPassword}
+            className="text-xs font-medium text-white/60 px-3 py-1.5 rounded-lg border border-white/15 hover:bg-white/10 hover:text-white transition-colors"
+          >
+            Reset Password
+          </button>
+          <button
             onClick={handleLogout}
-            className="w-full text-left text-xs font-medium text-white/60 px-3 py-2 rounded-lg border border-white/15 hover:bg-white/10 hover:text-white transition-colors"
+            className="text-xs font-medium text-white/60 px-3 py-1.5 rounded-lg border border-white/15 hover:bg-white/10 hover:text-white transition-colors"
           >
             Sign out
           </button>
         </div>
-        <button
-          onClick={handleLogout}
-          className="md:hidden text-xs font-medium text-white/60 border border-white/15 rounded-lg px-3 py-1.5 shrink-0 hover:bg-white/10 hover:text-white transition-colors"
-        >
-          Sign out
-        </button>
-      </aside>
+      </header>
 
       {/* ── Main content ── */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col w-full">
         {/* ── Top Header Image ── */}
-        <header className="bg-white border-b w-full shrink-0 flex justify-center" style={{ borderColor: "#dde3ec" }}>
-          <img src={headerImg} alt="AFMS Header" className="w-full max-h-32 object-contain py-2" />
-        </header>
-        <main className="flex-1 p-6 md:p-10 md:px-12 max-w-[980px]">
+        <div className="bg-white border-b w-full shrink-0 flex justify-center shadow-sm" style={{ borderColor: "#dde3ec" }}>
+          <img src={headerImg} alt="AFMS Header" className="w-full max-h-24 object-contain py-2" />
+        </div>
+        <main className="flex-1 p-6 mx-auto w-full max-w-7xl">
 
         {view === "upload" ? (
           /* ── Upload Entry view ── */
@@ -221,79 +322,70 @@ export default function AdminDashboard() {
                 Upload Entry
               </h1>
               <p className="text-sm" style={{ fontFamily: "Tahoma, Geneva, sans-serif", color: "#556" }}>
-                Use the{" "}
                 <a href="/sample.csv" download="sample.csv" className="font-semibold underline underline-offset-2 cursor-pointer" style={{ color: DB }}>
-                  sample CSV template
+                  Download Sample CSV Template
                 </a>
-                {" "}— columns: name, email, amount, category, services.
               </p>
             </header>
 
-            {/* Drop zone */}
-            <div
-              className={`border border-dashed rounded-xl bg-white px-6 py-12 text-center cursor-pointer mb-5 transition-colors motion-reduce:transition-none`}
-              style={
-                dragActive
-                  ? { borderColor: DB, background: "#eaf0f8" }
-                  : undefined
-              }
-              onMouseEnter={(e) => { if (!dragActive) e.currentTarget.style.borderColor = DB; }}
-              onMouseLeave={(e) => { if (!dragActive) e.currentTarget.style.borderColor = "#d0d0d0"; }}
-              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                hidden
-                onChange={(e) => handleFileChosen(e.target.files?.[0])}
-              />
-              {file ? (
-                <p className="font-mono text-sm" style={{ color: DB }}>{file.name}</p>
-              ) : (
-                <>
-                  <p className="text-[15px] font-semibold mb-1" style={{ color: DB }}>Drop a CSV file here</p>
-                  <p className="text-[13px]" style={{ fontFamily: "Tahoma, Geneva, sans-serif", color: "#8899aa" }}>
-                    or click to browse · .csv files only
-                  </p>
-                </>
-              )}
-            </div>
-
-            <button
-              style={{ background: file && !uploading ? DB : undefined }}
-              className="text-white border-none text-sm font-semibold px-5 py-2.5 rounded-lg cursor-pointer transition-colors motion-reduce:transition-none disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-              disabled={!file || uploading}
-              onClick={handleUpload}
-              onMouseEnter={(e) => { if (file && !uploading) e.currentTarget.style.background = DB_HOVER; }}
-              onMouseLeave={(e) => { if (file && !uploading) e.currentTarget.style.background = DB; }}
-            >
-              {uploading ? "Uploading…" : "Upload Entry"}
-            </button>
-
-            {uploadError && (
-              <p className="text-sm mt-3.5 border rounded-lg px-4 py-3 bg-white" style={{ color: "#556", borderColor: "#d0d0d0" }}>
-                {uploadError}
-              </p>
-            )}
-
-            {uploadResult && (
-              <div className="mt-4 px-4 py-4 bg-white border rounded-lg" style={{ borderColor: "#dde3ec" }}>
-                <p className="text-sm font-medium" style={{ color: DB }}>
-                  {uploadResult.insertedCount ?? uploadResult.success ?? 0} record(s) added.
-                </p>
-                {uploadResult.errors?.length > 0 && (
-                  <ul className="mt-2.5 pl-4 text-[13px] text-[#556] list-disc">
-                    {uploadResult.errors.map((e, i) => (
-                      <li key={i}>Row {e.row}: {e.reason}</li>
-                    ))}
-                  </ul>
-                )}
+            {/* Uploader Section */}
+            <div className="bg-white rounded-xl shadow-sm border p-6 flex flex-col gap-5" style={{ borderColor: "#dde3ec" }}>
+              <div>
+                <h2 className="text-lg font-bold mb-2">Upload CSV Data</h2>
+                <p className="text-sm text-gray-500 mb-4">Drag and drop your spreadsheet here or click to browse.</p>
+                <div
+                  className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${
+                    dragActive ? "border-black bg-gray-50" : "border-gray-300 bg-gray-50/50 hover:bg-gray-50"
+                  }`}
+                  onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                  onDragLeave={() => setDragActive(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input type="file" ref={fileInputRef} accept=".csv" className="hidden" onChange={(e) => handleFileChosen(e.target.files?.[0])} />
+                  <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-semibold mb-1">{file ? file.name : "Select a CSV file"}</p>
+                  <p className="text-xs text-gray-500">Must follow the FMS schema · .csv files only</p>
+                </div>
               </div>
-            )}
+
+              <button
+                onClick={handleUpload}
+                disabled={!file || uploading}
+                className="w-full text-white text-sm font-bold py-3 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                style={{ background: DB }}
+              >
+                {uploading ? "Uploading…" : "Process & Import"}
+              </button>
+
+              {uploadError && <p className="text-xs text-red-600 text-center bg-red-50 p-2 rounded border border-red-200">{uploadError}</p>}
+              {uploadResult && (
+                <div className="text-xs text-green-700 bg-green-50 p-3 rounded border border-green-200">
+                  <p className="font-bold mb-1">Import Successful</p>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    <li>Added: {uploadResult.processed ?? uploadResult.insertedCount ?? uploadResult.success ?? 0}</li>
+                    <li>Duplicates skipped: {uploadResult.duplicatesSkipped || 0}</li>
+                  </ul>
+                </div>
+              )}
+
+              <hr className="border-gray-200" />
+
+              <div>
+                <p className="text-sm font-semibold mb-1">Add a Single Entry Manually</p>
+                <p className="text-xs text-gray-500 mb-3">Fill in the record details without uploading a CSV file.</p>
+                <button
+                  onClick={openAddModal}
+                  className="w-full text-sm font-bold py-3 rounded-lg transition-all border-2 border-dashed border-gray-300 hover:border-black hover:bg-gray-50 text-gray-700"
+                >
+                  + Add Single Entry
+                </button>
+              </div>
+            </div>
           </section>
 
         ) : (
@@ -323,93 +415,101 @@ export default function AdminDashboard() {
             )}
 
             {!recordsLoading && !recordsError && records.length > 0 && (
-              <div className="rounded-xl border overflow-x-auto bg-white shadow-sm" style={{ borderColor: "#dde3ec" }}>
-                <table className="w-full border-collapse text-sm whitespace-nowrap">
-                  <thead>
-                    <tr>
-                      {["Name", "Email", "Amount", "After TDS", "Payment Type", "Component", "Status", "Action"].map((h) => (
-                        <th
-                          key={h}
-                          className={`text-[11px] uppercase tracking-widest px-5 py-4 border-b font-bold ${
-                            (h === "Amount" || h === "After TDS") ? "text-right" : "text-left"
-                          }`}
-                          style={{ color: "#64748b", borderColor: "#dde3ec", background: "#f8fafc" }}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {records.map((r) => {
-                      let status = "Form Pending";
-                      if (r.formSubmitted) status = "Needs Approval";
-                      if (r.registrarApproved) status = "Ready for Payment";
-                      if (r.paymentProcessed) status = "Paid";
-                      
-                      return (
-                      <tr
-                        key={r._id || r.email}
-                        className="transition-colors"
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f7fb")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "")}
-                      >
-                        <td className="px-5 py-4 border-b font-medium" style={{ borderColor: "#edf0f7", color: DB }}>{r.name}</td>
-                        <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.email}</td>
-                        <td className="px-5 py-4 border-b text-right font-mono tabular-nums font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>
-                          {Number(r.amount).toLocaleString()}
-                        </td>
-                        <td className="px-5 py-4 border-b text-right font-mono tabular-nums font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>
-                          {r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString() : (r.category === "Refund" || r.category === "TA/DA" ? Number(r.amount).toLocaleString() : Number(r.amount * 0.9).toLocaleString())}
-                        </td>
-                        <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.category}</td>
-                        <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.services}</td>
-                        <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7" }}>
-                          <span
-                            className="inline-block text-xs font-semibold px-3 py-1 rounded-full border"
-                            style={
-                              status === "Paid"
-                                ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
-                                : status === "Ready for Payment"
-                                ? { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
-                                : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
-                            }
+                <div className="w-full overflow-x-auto bg-white rounded-lg shadow-sm border border-gray-200">
+                  <table className="w-full border-collapse text-sm text-left whitespace-nowrap">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        {["Name", "UTRN", "Amount", "After TDS", "Action"].map((h) => (
+                          <th
+                            key={h}
+                            className={`text-[11px] font-bold uppercase tracking-wider text-gray-500 py-3 px-4 ${
+                              (h === "Amount" || h === "After TDS") ? "text-right" : ""
+                            }`}
                           >
-                            {status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7" }}>
-                          <div className="flex items-center gap-2">
-                            {status === "Paid" ? (
-                              <button
-                                onClick={() => window.open(`/receipt/${r.token}`, '_blank')}
-                                className="text-[10px] font-bold uppercase tracking-wider text-white px-3 py-1.5 rounded-md transition-colors bg-green-600 hover:bg-green-700 shadow-sm"
-                              >
-                                View / Download Receipt
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => status === "Ready for Payment" && handleProcess(r._id)}
-                                disabled={status !== "Ready for Payment"}
-                                className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-md transition-all duration-200 ${
-                                  status === "Ready for Payment"
-                                    ? "bg-green-600 text-white hover:bg-green-700 shadow-sm shadow-green-200 cursor-pointer"
-                                    : "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed"
-                                }`}
-                              >
-                                Approve & Generate Receipt
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDelete(r._id)}
-                              className="text-[10px] font-bold uppercase tracking-wider text-red-600 px-3 py-1.5 rounded-md border border-red-200 transition-colors hover:bg-red-50"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
+                            {h}
+                          </th>
+                        ))}
                       </tr>
-                    )})}
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {records.map((r) => {
+                        let status = "Form Pending";
+                        if (r.formSubmitted) status = "Needs Admin Approval";
+                        if (r.adminApproved) status = "Needs Registrar Approval";
+                        if (r.registrarApproved) status = "Ready for Payment";
+                        if (r.paymentProcessed) status = "Paid";
+                        
+                        return (
+                        <tr
+                          key={r._id || r.email}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="py-2 px-4 font-medium text-gray-800">{r.name}</td>
+                          <td className="py-2 px-4 text-gray-500 font-mono text-xs">{r.receiptNumber || r.token?.split("-")[0].toUpperCase() || "—"}</td>
+                          <td className="py-2 px-4 text-right font-mono text-gray-700">
+                            {Number(r.amount).toLocaleString("en-IN")}
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono text-gray-700">
+                            {r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString("en-IN") : (r.category === "Refund" || r.category === "TA/DA" ? Number(r.amount).toLocaleString("en-IN") : Number(r.amount * 0.9).toLocaleString("en-IN"))}
+                          </td>
+                          <td className="py-2 px-4">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded border"
+                                style={
+                                  status === "Paid"
+                                    ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
+                                    : status === "Ready for Payment" || status === "Needs Admin Approval"
+                                    ? { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
+                                    : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
+                                }
+                              >
+                                {status}
+                              </span>
+                              <button
+                                onClick={() => openRecordModal(r)}
+                                className="text-[10px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-3 py-1.5 rounded-md transition-colors shadow-sm"
+                              >
+                                Preview / Edit
+                              </button>
+                              {status === "Form Pending" && (
+                                <button
+                                  onClick={() => copyLink(r.token)}
+                                  className="text-[10px] font-bold uppercase tracking-wider text-black bg-gray-200 hover:bg-gray-300 px-3 py-1.5 rounded-md transition-colors"
+                                >
+                                  Copy Link
+                                </button>
+                              )}
+                              {status === "Needs Admin Approval" && (
+                                <button
+                                  onClick={() => handleAdminApprove(r._id)}
+                                  className="text-[10px] font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-md transition-colors shadow-sm"
+                                >
+                                  Approve
+                                </button>
+                              )}
+                              {status === "Ready for Payment" && (
+                                <button
+                                  onClick={() => handleProcess(r._id)}
+                                  className="text-[10px] font-bold uppercase tracking-wider text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-md transition-colors shadow-sm"
+                                >
+                                  Process
+                                </button>
+                              )}
+                              {status === "Paid" && (
+                                <button
+                                  onClick={() => window.open(`/receipt/${r.token}`, '_blank')}
+                                  className="text-[10px] font-bold uppercase tracking-wider text-white bg-black hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors shadow-sm"
+                                >
+                                  Receipt
+                                </button>
+                              )}
+
+                              {/* Req 16: Delete button removed from Admin — only Registrar can delete */}
+                            </div>
+                          </td>
+                        </tr>
+                      )})}
                   </tbody>
                 </table>
               </div>
@@ -418,6 +518,72 @@ export default function AdminDashboard() {
         )}
         </main>
       </div>
+
+      {/* Generic Modal for Add/Edit/Preview */}
+      {showRecordModal && (
+        <RecordModal 
+          record={activeRecord} 
+          onClose={() => setShowRecordModal(false)}
+          onSave={handleSaveRecord}
+        />
+      )}
+
+      {/* ── Process Payment Modal (Req 17) ── */}
+      {showProcessModal && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowProcessModal(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-bold mb-4">Process Payment</h2>
+              <p className="text-sm text-gray-500 mb-4">Enter the bank transfer details to generate the receipt.</p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Bank Reference No. *</label>
+                  <input
+                    type="text"
+                    value={processBankRef}
+                    onChange={(e) => setProcessBankRef(e.target.value)}
+                    placeholder="e.g. UTIB20260001234"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Date of Transfer *</label>
+                  <input
+                    type="date"
+                    value={processDateOfTransfer}
+                    onChange={(e) => setProcessDateOfTransfer(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                  />
+                </div>
+              </div>
+
+              {processError && (
+                <p className="text-sm text-red-600 mt-3">{processError}</p>
+              )}
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setShowProcessModal(false)}
+                  className="text-sm px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitProcess}
+                  className="text-sm font-semibold px-5 py-2 rounded-lg text-white bg-green-600 hover:bg-green-700 transition-colors"
+                >
+                  Process & Generate Receipt
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+
+
     </div>
   );
 }

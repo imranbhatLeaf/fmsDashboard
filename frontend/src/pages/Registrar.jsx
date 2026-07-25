@@ -4,12 +4,13 @@ import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logomain.avif";
 import asssrLogo from "../assets/asssrFav.avif";
 import headerImg from "../assets/header.png";
+import RecordModal from "../components/RecordModal";
 
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
 
 const COMPONENTS = ["ASSSR", "JASSSR", "DHC", "VMI"];
 
-const DB = "#1b3358";
+const DB = "black";
 
 export default function Registrar() {
   const { auth, logout } = useAuth();
@@ -20,6 +21,12 @@ export default function Registrar() {
   const [loading, setLoading]               = useState(false);
   const [error, setError]                   = useState(null);
   const [sortConfig, setSortConfig]         = useState({ key: null, direction: 'asc' });
+  const [previewRecord, setPreviewRecord]   = useState(null);
+
+  // Recycle bin state (Req 19)
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
+  const [recycleBinRecords, setRecycleBinRecords] = useState([]);
+  const [recycleBinLoading, setRecycleBinLoading] = useState(false);
 
   // Summary counts
   const [summary, setSummary] = useState({ total: 0, sent: 0, pending: 0, failed: 0 });
@@ -49,9 +56,67 @@ export default function Registrar() {
 
   useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
+  // Fetch recycle bin records (Req 19)
+  async function fetchRecycleBin() {
+    setRecycleBinLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/records/recycle-bin`);
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+      setRecycleBinRecords(Array.isArray(data) ? data : []);
+    } catch (err) {
+      alert("Failed to load recycle bin: " + err.message);
+    } finally {
+      setRecycleBinLoading(false);
+    }
+  }
+
+  function toggleRecycleBin() {
+    if (!showRecycleBin) {
+      fetchRecycleBin();
+    }
+    setShowRecycleBin(!showRecycleBin);
+  }
+
+  // Restore a soft-deleted record (Req 19)
+  async function handleRestore(id) {
+    try {
+      const res = await fetch(`${API_BASE}/api/records/${id}/restore`, { method: "PUT" });
+      if (!res.ok) throw new Error("Restore failed");
+      setRecycleBinRecords((prev) => prev.filter((r) => r._id !== id));
+      fetchRecords(); // refresh main list
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
   function handleLogout() {
     logout();
     navigate("/login");
+  }
+
+  async function handleResetPassword() {
+    const newPassword = prompt("Enter new password (min 6 characters):");
+    if (!newPassword) return;
+    if (newPassword.length < 6) {
+      alert("Password must be at least 6 characters.");
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth?.token}`
+        },
+        body: JSON.stringify({ newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to reset password.");
+      alert("Password reset successfully.");
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   async function handleApprove(id) {
@@ -64,8 +129,9 @@ export default function Registrar() {
     }
   }
 
+  // Req 16: Delete is limited to Registrar only (kept here)
   async function handleDelete(id) {
-    if (!window.confirm("Are you sure you want to delete this record?")) return;
+    if (!window.confirm("Are you sure you want to delete this record? It will be moved to the Recycle Bin for 30 days.")) return;
     try {
       const res = await fetch(`${API_BASE}/api/records/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Deletion failed");
@@ -93,9 +159,10 @@ export default function Registrar() {
   });
 
   const totalAmount = records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString() : "-";
 
   return (
-    <div className="min-h-screen font-sans flex flex-col" style={{ background: "#f4f2ed", color: "#1b2230" }}>
+    <div className="min-h-screen font-sans flex flex-col" style={{ background: "#FAF9F6", color: "black" }}>
       {/* ── Top Header Image ── */}
       <header className="bg-white border-b w-full shrink-0 flex justify-center" style={{ borderColor: "#dde3ec" }}>
         <img src={headerImg} alt="AFMS Header" className="w-full max-h-32 object-contain py-2" />
@@ -122,6 +189,15 @@ export default function Registrar() {
           <span className="hidden md:block text-xs text-[#aab]">
             Signed in as <span className="font-semibold" style={{ color: DB }}>{auth?.username}</span>
           </span>
+          <button
+            onClick={handleResetPassword}
+            className="text-xs font-medium border rounded-lg px-3 py-1.5 transition-colors"
+            style={{ color: "#556", borderColor: "#dde3ec" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "#eef1f8"; e.currentTarget.style.borderColor = "#bbc5d8"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = ""; e.currentTarget.style.borderColor = "#dde3ec"; }}
+          >
+            Reset Password
+          </button>
           <button
             onClick={handleLogout}
             className="text-xs font-medium border rounded-lg px-3 py-1.5 transition-colors"
@@ -172,26 +248,26 @@ export default function Registrar() {
           </div>
         </div>
 
-        {/* Category filter tabs */}
-        <div className="flex gap-2 flex-wrap mb-5">
+        {/* Category filter tabs + Recycle Bin toggle */}
+        <div className="flex gap-2 flex-wrap mb-5 items-center">
           {["all", ...COMPONENTS].map((cat) => (
             <button
               key={cat}
-              onClick={() => setActiveCategory(cat)}
+              onClick={() => { setActiveCategory(cat); setShowRecycleBin(false); }}
               className="text-xs font-semibold px-4 py-1.5 rounded-full border transition-colors"
               style={
-                activeCategory === cat
+                activeCategory === cat && !showRecycleBin
                   ? { background: DB, color: "#fff", borderColor: DB }
                   : { background: "#fff", color: "#556", borderColor: "#dde3ec" }
               }
               onMouseEnter={(e) => {
-                if (activeCategory !== cat) {
+                if (activeCategory !== cat || showRecycleBin) {
                   e.currentTarget.style.borderColor = "#9aaac8";
                   e.currentTarget.style.color = DB;
                 }
               }}
               onMouseLeave={(e) => {
-                if (activeCategory !== cat) {
+                if (activeCategory !== cat || showRecycleBin) {
                   e.currentTarget.style.borderColor = "#dde3ec";
                   e.currentTarget.style.color = "#556";
                 }
@@ -200,116 +276,198 @@ export default function Registrar() {
               {cat === "all" ? "All" : cat}
             </button>
           ))}
+          <div className="w-px h-6 bg-gray-300 mx-1"></div>
+          {/* Req 19: Recycle Bin button */}
+          <button
+            onClick={toggleRecycleBin}
+            className="text-xs font-semibold px-4 py-1.5 rounded-full border transition-colors flex items-center gap-1.5"
+            style={
+              showRecycleBin
+                ? { background: "#dc2626", color: "#fff", borderColor: "#dc2626" }
+                : { background: "#fff", color: "#dc2626", borderColor: "#fca5a5" }
+            }
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+            </svg>
+            Recycle Bin
+          </button>
         </div>
 
-        {/* Sort controls */}
-        <div className="flex gap-2 mb-4">
-          <span className="text-sm text-[#556] mr-2">Sort by:</span>
-          <button 
-            onClick={() => handleSort('services')} 
-            className="text-xs px-3 py-1 rounded border hover:bg-gray-50 transition-colors"
-          >
-            Component {sortConfig.key === 'services' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-          </button>
-          <button 
-            onClick={() => handleSort('year')} 
-            className="text-xs px-3 py-1 rounded border hover:bg-gray-50 transition-colors"
-          >
-            Year {sortConfig.key === 'year' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-          </button>
-        </div>
+        {/* ── Recycle Bin View (Req 19) ── */}
+        {showRecycleBin ? (
+          <section>
+            <header className="mb-6">
+              <h2 className="font-serif text-xl font-bold flex items-center gap-2" style={{ color: "#dc2626" }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                </svg>
+                Recycle Bin
+              </h2>
+              <p className="text-sm mt-1" style={{ color: "#8899aa" }}>Deleted records are kept for 30 days before permanent removal.</p>
+            </header>
 
-        {/* Table */}
-        {loading && <p className="text-sm" style={{ color: "#aab" }}>Loading transactions…</p>}
-        {error && (
-          <p className="text-sm border rounded-lg px-4 py-3 bg-white" style={{ color: "#556", borderColor: "#dde3ec" }}>{error}</p>
-        )}
-        {!loading && !error && records.length === 0 && (
-          <p className="text-sm" style={{ color: "#aab" }}>No transactions found for this category.</p>
-        )}
-        {!loading && !error && records.length > 0 && (
-          <div className="rounded-xl border overflow-x-auto bg-white shadow-sm" style={{ borderColor: "#dde3ec" }}>
-            <table className="w-full border-collapse text-sm whitespace-nowrap">
-              <thead>
-                <tr>
-                  {["Name", "Email", "Amount", "After TDS", "Payment Type", "Component", "Status", "Action"].map((h) => (
-                    <th
-                      key={h}
-                      className={`text-[11px] uppercase tracking-widest px-5 py-4 border-b font-bold ${(h === "Amount" || h === "After TDS") ? "text-right" : "text-left"}`}
-                      style={{ color: "#64748b", borderColor: "#dde3ec", background: "#f8fafc" }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedRecords.map((r) => {
-                  let status = "Form Pending";
-                  if (r.formSubmitted) status = "Needs Approval";
-                  if (r.registrarApproved) status = "Approved";
-                  if (r.paymentProcessed) status = "Paid";
-                  
-                  return (
-                    <tr
-                      key={r._id || r.email}
-                      className="transition-colors"
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f7fb")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "")}
-                    >
-                      <td className="px-5 py-4 border-b font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>{r.name}</td>
-                      <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.email}</td>
-                      <td className="px-5 py-4 border-b text-right font-mono tabular-nums font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>
-                        ₹{Number(r.amount).toLocaleString("en-IN")}
-                      </td>
-                      <td className="px-5 py-4 border-b text-right font-mono tabular-nums font-semibold" style={{ borderColor: "#edf0f7", color: DB }}>
-                        ₹{r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString("en-IN") : (r.category === "Refund" || r.category === "TA/DA" ? Number(r.amount).toLocaleString("en-IN") : Number(r.amount * 0.9).toLocaleString("en-IN"))}
-                      </td>
-                      <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.category}</td>
-                      <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7", color: "#556" }}>{r.services}</td>
-                      <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7" }}>
-                        <span
-                          className="inline-block text-xs font-semibold px-3 py-1 rounded-full border"
-                          style={
-                            status === "Approved" || status === "Paid"
-                              ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
-                              : status === "Needs Approval"
-                              ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
-                              : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
-                          }
-                        >
-                          {status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 border-b" style={{ borderColor: "#edf0f7" }}>
-                        <div className="flex items-center gap-2">
-                          {status === "Needs Approval" && (
-                            <button
-                              onClick={() => handleApprove(r._id)}
-                              className="text-[10px] font-bold uppercase tracking-wider text-white px-3 py-1.5 rounded-md transition-colors"
-                              style={{ background: DB }}
-                              onMouseEnter={(e) => (e.currentTarget.style.background = "#152849")}
-                              onMouseLeave={(e) => (e.currentTarget.style.background = DB)}
-                            >
-                              Approve
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDelete(r._id)}
-                            className="text-[10px] font-bold uppercase tracking-wider text-red-600 px-3 py-1.5 rounded-md border border-red-200 transition-colors hover:bg-red-50"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
+            {recycleBinLoading && <p className="text-sm" style={{ color: "#aab" }}>Loading deleted records…</p>}
+            {!recycleBinLoading && recycleBinRecords.length === 0 && (
+              <p className="text-sm" style={{ color: "#aab" }}>Recycle bin is empty.</p>
+            )}
+            {!recycleBinLoading && recycleBinRecords.length > 0 && (
+              <div className="w-full overflow-x-auto bg-white rounded-lg shadow-sm border border-red-200">
+                <table className="w-full border-collapse text-sm text-left whitespace-nowrap">
+                  <thead className="bg-red-50 border-b border-red-200">
+                    <tr>
+                      {["Name", "Category", "Amount", "Deleted On", "Days Left", "Action"].map((h) => (
+                        <th key={h} className="text-[11px] font-bold uppercase tracking-wider text-red-400 py-3 px-4">{h}</th>
+                      ))}
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-red-50">
+                    {recycleBinRecords.map((r) => {
+                      const deletedDate = new Date(r.deletedAt);
+                      const daysLeft = Math.max(0, 30 - Math.floor((Date.now() - deletedDate.getTime()) / (1000 * 60 * 60 * 24)));
+                      return (
+                        <tr key={r._id} className="hover:bg-red-50/50 transition-colors">
+                          <td className="py-2 px-4 font-medium text-gray-800">{r.name}</td>
+                          <td className="py-2 px-4 text-gray-500">{r.category}</td>
+                          <td className="py-2 px-4 font-mono text-gray-700">₹{Number(r.amount).toLocaleString("en-IN")}</td>
+                          <td className="py-2 px-4 text-gray-500 text-xs">{fmtDate(r.deletedAt)}</td>
+                          <td className="py-2 px-4">
+                            <span className={`text-xs font-bold ${daysLeft <= 7 ? 'text-red-600' : 'text-orange-500'}`}>
+                              {daysLeft} day{daysLeft !== 1 ? 's' : ''}
+                            </span>
+                          </td>
+                          <td className="py-2 px-4">
+                            <button
+                              onClick={() => handleRestore(r._id)}
+                              className="text-[10px] font-bold uppercase tracking-wider text-green-700 px-3 py-1.5 rounded-md border border-green-200 hover:bg-green-50 transition-colors"
+                            >
+                              Restore
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        ) : (
+          <>
+            {/* Sort controls */}
+            <div className="flex gap-2 mb-4">
+              <span className="text-sm text-[#556] mr-2">Sort by:</span>
+              <button 
+                onClick={() => handleSort('services')} 
+                className="text-xs px-3 py-1 rounded border hover:bg-gray-50 transition-colors"
+              >
+                Component {sortConfig.key === 'services' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button 
+                onClick={() => handleSort('year')} 
+                className="text-xs px-3 py-1 rounded border hover:bg-gray-50 transition-colors"
+              >
+                Year {sortConfig.key === 'year' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+              </button>
+            </div>
+
+            {/* Table */}
+            {loading && <p className="text-sm" style={{ color: "#aab" }}>Loading transactions…</p>}
+            {error && (
+              <p className="text-sm border rounded-lg px-4 py-3 bg-white" style={{ color: "#556", borderColor: "#dde3ec" }}>{error}</p>
+            )}
+            {!loading && !error && records.length === 0 && (
+              <p className="text-sm" style={{ color: "#aab" }}>No transactions found for this category.</p>
+            )}
+            {!loading && !error && records.length > 0 && (
+              <div className="w-full overflow-x-auto bg-white rounded-lg shadow-sm border border-gray-200">
+                <table className="w-full border-collapse text-sm text-left whitespace-nowrap">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      {["Name", "UTRN", "Amount", "After TDS", "Action"].map((h) => (
+                        <th
+                          key={h}
+                          className={`text-[11px] font-bold uppercase tracking-wider text-gray-500 py-3 px-4 ${
+                            (h === "Amount" || h === "After TDS") ? "text-right" : ""
+                          }`}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {sortedRecords.map((r) => {
+                      let status = "Form Pending";
+                      if (r.formSubmitted) status = "Needs Admin Approval";
+                      if (r.adminApproved) status = "Needs Registrar Approval";
+                      if (r.registrarApproved) status = "Approved";
+                      if (r.paymentProcessed) status = "Paid";
+                      
+                      return (
+                        <tr
+                          key={r._id || r.email}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="py-2 px-4 font-medium text-gray-800">{r.name}</td>
+                          <td className="py-2 px-4 text-gray-500 font-mono text-xs">{r.receiptNumber || r.token?.split("-")[0].toUpperCase() || "—"}</td>
+                          <td className="py-2 px-4 text-right font-mono text-gray-700">
+                            ₹{Number(r.amount).toLocaleString("en-IN")}
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono text-gray-700">
+                            ₹{r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString("en-IN") : (r.category === "Refund" || r.category === "TA/DA" ? Number(r.amount).toLocaleString("en-IN") : Number(r.amount * 0.9).toLocaleString("en-IN"))}
+                          </td>
+                          <td className="py-2 px-4">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded border"
+                                style={
+                                  status === "Approved" || status === "Paid"
+                                    ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
+                                    : status === "Needs Registrar Approval"
+                                    ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
+                                    : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
+                                }
+                              >
+                                {status}
+                              </span>
+                              <button
+                                onClick={() => setPreviewRecord(r)}
+                                className="text-[10px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-3 py-1.5 rounded-md transition-colors shadow-sm"
+                              >
+                                Preview
+                              </button>
+                              {status === "Needs Registrar Approval" && (
+                                <button
+                                  onClick={() => handleApprove(r._id)}
+                                  className="text-[10px] font-bold uppercase tracking-wider text-white px-3 py-1.5 rounded-md transition-colors shadow-sm"
+                                  style={{ background: DB }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = "#333")}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = DB)}
+                                >
+                                  Registrar Approve
+                                </button>
+                              )}
+                              {/* Req 16: Delete button — limited to Registrar only */}
+                              <button
+                                onClick={() => handleDelete(r._id)}
+                                className="text-[10px] font-bold uppercase tracking-wider text-red-600 px-3 py-1.5 rounded-md border border-red-200 transition-colors hover:bg-red-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </main>
+      <RecordModal record={previewRecord} onClose={() => setPreviewRecord(null)} />
     </div>
   );
 }
