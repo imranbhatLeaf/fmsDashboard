@@ -467,7 +467,9 @@ export default function Registrar() {
           </>
         )}
       </main>
-      <RecordModal record={previewRecord} onClose={() => setPreviewRecord(null)} />
+      {previewRecord && (
+        <RecordModal record={previewRecord} onClose={() => setPreviewRecord(null)} />
+      )}
     </div>
   );
 }

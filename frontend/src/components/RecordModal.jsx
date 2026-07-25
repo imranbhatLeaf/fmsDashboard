@@ -45,7 +45,9 @@ export default function RecordModal({ record, onClose, onSave }) {
             {!isAdd && !isEditing && (
               <>
                 <button onClick={() => window.print()} className="text-[10px] font-bold uppercase tracking-wider text-white bg-black hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors print:hidden">Print</button>
-                <button onClick={() => setIsEditing(true)} className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors print:hidden">Edit</button>
+                {onSave && (
+                  <button onClick={() => setIsEditing(true)} className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors print:hidden">Edit</button>
+                )}
               </>
             )}
             <button onClick={onClose} className="text-gray-500 hover:text-black print:hidden">
