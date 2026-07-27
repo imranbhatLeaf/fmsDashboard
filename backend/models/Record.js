@@ -84,6 +84,57 @@ const recordSchema = new mongoose.Schema(
     dateOfForwarding: { type: Date, default: null },
     dateOfApproval: { type: Date, default: null },
 
+    // ASSSR Refund Form fields
+    entitledAmount: { type: Number, default: null },
+    entitledAmountWords: { type: String, default: null },
+    expenditureDebitableTo: { type: String, default: null },
+    treasurerSignature: { type: String, default: null },
+    participationPaymentCertifiedBy: { type: String, default: null },
+    receivedAmount: { type: Number, default: null },
+    receivedAmountWords: { type: String, default: null },
+    applicantSignature: { type: String, default: null },
+    passedForPaymentAmount: { type: Number, default: null },
+    passedForPaymentAmountWords: { type: String, default: null },
+    utrRrnReferenceNumber: { type: String, default: null },
+    paymentDated: { type: Date, default: null },
+    secretaryOrPresidentSignature: { type: String, default: null },
+
+    // Snake case mappings for compatibility
+    entitled_amount: { type: Number, default: null },
+    entitled_amount_words: { type: String, default: null },
+    expenditure_debitable_to: { type: String, default: null },
+    treasurer_signature: { type: String, default: null },
+    participation_payment_certified_by: { type: String, default: null },
+    received_amount: { type: Number, default: null },
+    received_amount_words: { type: String, default: null },
+    applicant_signature: { type: String, default: null },
+    passed_for_payment_amount: { type: Number, default: null },
+    passed_for_payment_amount_words: { type: String, default: null },
+    utr_rrn_reference_number: { type: String, default: null },
+    payment_dated: { type: Date, default: null },
+    secretary_or_president_signature: { type: String, default: null },
+    programme_applied_for: { type: String, default: null },
+    refund_amount: { type: Number, default: null },
+    mobile_number: { type: String, default: null },
+    applicant_name: { type: String, default: null },
+    reason_for_refund: { type: String, default: null },
+
+    // Fellowship fields
+    fellowshipAsPerNorms: { type: String, default: null },
+    fellowship_as_per_norms: { type: String, default: null },
+    claimant_signature: { type: String, default: null },
+
+    // TA/DA fields
+    journeyRows: { type: Array, default: [] },
+    localJourneyRows: { type: Array, default: [] },
+    remarks: { type: String, default: null },
+
+    // Honorarium fields
+    presencesUnit: { type: String, default: null },
+    presences_unit: { type: String, default: null },
+    honorariumAsPerNorms: { type: String, default: null },
+    honorarium_as_per_norms: { type: String, default: null },
+
     // Soft-delete support (recycle bin)
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },

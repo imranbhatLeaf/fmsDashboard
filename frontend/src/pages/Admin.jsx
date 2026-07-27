@@ -69,49 +69,31 @@ export default function AdminDashboard() {
   }
 
   // Req 17: Process now requires bankReferenceNo and dateOfTransfer
+  // Req 17: Process now auto-generates bankReferenceNo (UTRN) and defaults dateOfTransfer
   async function handleProcess(id) {
-    setProcessRecordId(id);
-    setProcessBankRef("");
-    setProcessDateOfTransfer("");
-    setProcessError("");
-    setShowProcessModal(true);
-  }
-
-  async function submitProcess() {
-    if (!processBankRef.trim()) {
-      setProcessError("Bank Reference No. is required.");
-      return;
-    }
-    if (!processDateOfTransfer) {
-      setProcessError("Date of Transfer is required.");
-      return;
-    }
-    setProcessError("");
+    if (!window.confirm("Are you sure you want to process this payment? The bank reference number (UTRN) and transfer date will be auto-generated.")) return;
     try {
-      const res = await fetch(`${API_BASE}/api/records/${processRecordId}/process`, {
+      const res = await fetch(`${API_BASE}/api/records/${id}/process`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${auth?.token}`
         },
-        body: JSON.stringify({
-          bankReferenceNo: processBankRef.trim(),
-          dateOfTransfer: processDateOfTransfer,
-        }),
+        body: JSON.stringify({}),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Processing failed");
-      setRecords((prev) => prev.map((r) => r._id === processRecordId ? {
+      setRecords((prev) => prev.map((r) => r._id === id ? {
         ...r,
         paymentProcessed: true,
-        paymentProcessedAt: new Date(),
-        dateOfTransfer: processDateOfTransfer,
-        bankReferenceNo: processBankRef.trim(),
+        paymentProcessedAt: new Date(data.paymentProcessedAt || Date.now()),
+        dateOfTransfer: data.dateOfTransfer,
+        bankReferenceNo: data.bankReferenceNo,
         receiptNumber: data.receiptNumber || r.receiptNumber,
       } : r));
-      setShowProcessModal(false);
+      alert("Payment processed successfully! UTRN generated: " + data.bankReferenceNo);
     } catch (err) {
-      setProcessError(err.message);
+      alert(err.message);
     }
   }
 
@@ -124,9 +106,11 @@ export default function AdminDashboard() {
   // Generic Add/Edit
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [activeRecord, setActiveRecord] = useState(null);
+  const [initialFormType, setInitialFormType] = useState("standard");
 
-  function openAddModal() {
+  function openAddModal(formType = "standard") {
     setActiveRecord(null);
+    setInitialFormType(formType);
     setShowRecordModal(true);
   }
 
@@ -175,12 +159,7 @@ export default function AdminDashboard() {
   const [recordsError, setRecordsError] = useState(null);
   const [previewRecord, setPreviewRecord] = useState(null);
 
-  // Process modal state (Req 17)
-  const [showProcessModal, setShowProcessModal] = useState(false);
-  const [processRecordId, setProcessRecordId] = useState(null);
-  const [processBankRef, setProcessBankRef] = useState("");
-  const [processDateOfTransfer, setProcessDateOfTransfer] = useState("");
-  const [processError, setProcessError] = useState("");
+
 
   // Excel sorting configuration
   const [sortConfig, setSortConfig] = useState({ key: "dateOfEntry", direction: "desc" });
@@ -269,9 +248,9 @@ export default function AdminDashboard() {
 
   const getRecordStatus = (r) => {
     if (r.paymentProcessed) return "Paid";
-    if (r.registrarApproved) return "Ready for Payment";
-    if (r.adminApproved) return "Needs Registrar Approval";
-    if (r.formSubmitted) return "Needs Admin Approval";
+    if (r.adminApproved) return "Ready for Payment";
+    if (r.registrarApproved) return "Needs Admin Approval";
+    if (r.formSubmitted) return "Needs Registrar Approval";
     return "Form Pending";
   };
 
@@ -288,7 +267,7 @@ export default function AdminDashboard() {
       case "dateOfApproval": return r.dateOfApproval || r.registrarApprovedAt ? new Date(r.dateOfApproval || r.registrarApprovedAt).getTime() : 0;
       case "dateOfTransfer": return r.dateOfTransfer ? new Date(r.dateOfTransfer).getTime() : 0;
       case "status": return getRecordStatus(r);
-      case "utrn": return r.receiptNumber || r.token?.split("-")[0].toUpperCase() || "";
+      case "utrn": return r.bankReferenceNo || r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "";
       default: return "";
     }
   };
@@ -403,6 +382,45 @@ export default function AdminDashboard() {
             {/* Uploader Section */}
             <div className="bg-white rounded-xl shadow-sm border p-6 flex flex-col gap-5" style={{ borderColor: "#dde3ec" }}>
               <div>
+                <p className="text-sm font-semibold mb-1">Add a Single Entry Manually</p>
+                <p className="text-xs text-gray-500 mb-3">Choose a form format to add the record details directly.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  <button
+                    onClick={() => openAddModal("standard")}
+                    className="flex items-center justify-center gap-2 text-sm font-bold py-3 px-4 rounded-lg transition-all border-2 border-dashed border-gray-300 hover:border-black hover:bg-gray-50 text-gray-700 hover:text-black"
+                  >
+                    <span>+</span> Standard Payment Form
+                  </button>
+                  <button
+                    onClick={() => openAddModal("refund")}
+                    className="flex items-center justify-center gap-2 text-sm font-bold py-3 px-4 rounded-lg transition-all border-2 border-dashed border-gray-300 hover:border-black hover:bg-gray-50 text-gray-700 hover:text-black"
+                  >
+                    <span>+</span> Refund Form
+                  </button>
+                  <button
+                    onClick={() => openAddModal("fellowship")}
+                    className="flex items-center justify-center gap-2 text-sm font-bold py-3 px-4 rounded-lg transition-all border-2 border-dashed border-gray-300 hover:border-black hover:bg-gray-50 text-gray-700 hover:text-black"
+                  >
+                    <span>+</span> Fellowship Form
+                  </button>
+                  <button
+                    onClick={() => openAddModal("tada")}
+                    className="flex items-center justify-center gap-2 text-sm font-bold py-3 px-4 rounded-lg transition-all border-2 border-dashed border-gray-300 hover:border-black hover:bg-gray-50 text-gray-700 hover:text-black"
+                  >
+                    <span>+</span> TA/DA Bill Form
+                  </button>
+                  <button
+                    onClick={() => openAddModal("honorarium")}
+                    className="flex items-center justify-center gap-2 text-sm font-bold py-3 px-4 rounded-lg transition-all border-2 border-dashed border-gray-300 hover:border-black hover:bg-gray-50 text-gray-700 hover:text-black"
+                  >
+                    <span>+</span> Honorarium Form
+                  </button>
+                </div>
+              </div>
+
+              <hr className="border-gray-200" />
+
+              <div>
                 <h2 className="text-lg font-bold mb-2">Upload CSV Data</h2>
                 <p className="text-sm text-gray-500 mb-4">Drag and drop your spreadsheet here or click to browse.</p>
                 <div
@@ -444,19 +462,6 @@ export default function AdminDashboard() {
                   </ul>
                 </div>
               )}
-
-              <hr className="border-gray-200" />
-
-              <div>
-                <p className="text-sm font-semibold mb-1">Add a Single Entry Manually</p>
-                <p className="text-xs text-gray-500 mb-3">Fill in the record details without uploading a CSV file.</p>
-                <button
-                  onClick={openAddModal}
-                  className="w-full text-sm font-bold py-3 rounded-lg transition-all border-2 border-dashed border-gray-300 hover:border-black hover:bg-gray-50 text-gray-700"
-                >
-                  + Add Single Entry
-                </button>
-              </div>
             </div>
           </section>
 
@@ -527,7 +532,7 @@ export default function AdminDashboard() {
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfForwarding || r.adminApprovedAt)}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfApproval || r.registrarApprovedAt)}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfTransfer)}</td>
-                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-500 font-mono text-[11px]">{r.receiptNumber || r.token?.split("-")[0].toUpperCase() || "—"}</td>
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-500 font-mono text-[11px]">{r.bankReferenceNo || r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "—"}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300">
                             <span
                               className="inline-block text-[9px] font-bold uppercase tracking-wider px-1 py-0.2 rounded border"
@@ -536,6 +541,8 @@ export default function AdminDashboard() {
                                   ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
                                   : status === "Ready for Payment" || status === "Needs Admin Approval"
                                   ? { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
+                                  : status === "Needs Registrar Approval"
+                                  ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
                                   : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
                               }
                             >
@@ -599,64 +606,13 @@ export default function AdminDashboard() {
       {showRecordModal && (
         <RecordModal 
           record={activeRecord} 
+          defaultFormType={initialFormType}
           onClose={() => setShowRecordModal(false)}
           onSave={handleSaveRecord}
         />
       )}
 
-      {/* ── Process Payment Modal (Req 17) ── */}
-      {showProcessModal && (
-        <>
-          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setShowProcessModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
-              <h2 className="text-lg font-bold mb-4">Process Payment</h2>
-              <p className="text-sm text-gray-500 mb-4">Enter the bank transfer details to generate the receipt.</p>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Bank Reference No. *</label>
-                  <input
-                    type="text"
-                    value={processBankRef}
-                    onChange={(e) => setProcessBankRef(e.target.value)}
-                    placeholder="e.g. UTIB20260001234"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Date of Transfer *</label>
-                  <input
-                    type="date"
-                    value={processDateOfTransfer}
-                    onChange={(e) => setProcessDateOfTransfer(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
-                  />
-                </div>
-              </div>
-
-              {processError && (
-                <p className="text-sm text-red-600 mt-3">{processError}</p>
-              )}
-
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={() => setShowProcessModal(false)}
-                  className="text-sm px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={submitProcess}
-                  className="text-sm font-semibold px-5 py-2 rounded-lg text-white bg-green-600 hover:bg-green-700 transition-colors"
-                >
-                  Process & Generate Receipt
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
 
 
 

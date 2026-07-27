@@ -31,7 +31,7 @@ export default function Registrar() {
     setLoading(true);
     setError(null);
     try {
-      const query = activeCategory === "all" ? "?adminApproved=true" : `?adminApproved=true&component=${encodeURIComponent(activeCategory)}`;
+      const query = activeCategory === "all" ? "" : `?component=${encodeURIComponent(activeCategory)}`;
       const res = await fetch(`${API_BASE}/api/records${query}`, {
         headers: { Authorization: `Bearer ${auth?.token}` }
       });
@@ -161,9 +161,9 @@ export default function Registrar() {
 
   const getRecordStatus = (r) => {
     if (r.paymentProcessed) return "Paid";
-    if (r.registrarApproved) return "Approved";
-    if (r.adminApproved) return "Needs Registrar Approval";
-    if (r.formSubmitted) return "Needs Admin Approval";
+    if (r.adminApproved) return "Approved";
+    if (r.registrarApproved) return "Needs Admin Approval";
+    if (r.formSubmitted) return "Needs Registrar Approval";
     return "Form Pending";
   };
 
@@ -180,7 +180,7 @@ export default function Registrar() {
       case "dateOfApproval": return r.dateOfApproval || r.registrarApprovedAt ? new Date(r.dateOfApproval || r.registrarApprovedAt).getTime() : 0;
       case "dateOfTransfer": return r.dateOfTransfer ? new Date(r.dateOfTransfer).getTime() : 0;
       case "status": return getRecordStatus(r);
-      case "utrn": return r.receiptNumber || r.token?.split("-")[0].toUpperCase() || "";
+      case "utrn": return r.bankReferenceNo || r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "";
       default: return "";
     }
   };
@@ -446,12 +446,12 @@ export default function Registrar() {
                           <td className="px-2 py-1 border-r border-gray-300 text-right font-mono text-gray-700">
                             ₹{r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString("en-IN") : (r.category === "Refund" || r.category === "TA/DA" ? Number(r.amount).toLocaleString("en-IN") : Number(r.amount * 0.9).toLocaleString("en-IN"))}
                           </td>
-                          <td className="px-2 py-1 border-r border-gray-300 text-gray-500 font-mono text-xs">{r.receiptNumber || r.token?.split("-")[0].toUpperCase() || "—"}</td>
+                          <td className="px-2 py-1 border-r border-gray-300 text-gray-500 font-mono text-xs">{r.bankReferenceNo || r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "—"}</td>
                           <td className="px-2 py-1 border-r border-gray-300">
                             <span
                               className="inline-block text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
                               style={
-                                status === "Approved" || status === "Paid"
+                                status === "Approved" || status === "Paid" || status === "Needs Admin Approval"
                                   ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
                                   : status === "Needs Registrar Approval"
                                   ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }

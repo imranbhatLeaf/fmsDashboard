@@ -330,6 +330,9 @@ export default function FormPage() {
         if (!res.ok) { setError("invalid"); return; }
         const data = await res.json();
         setMeta(data);
+        if (data.formSubmitted) {
+          setSubmitted(true);
+        }
         setFormData({
           name: data.name,
           email: data.email,
@@ -413,32 +416,49 @@ export default function FormPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f5f5f0] flex items-center justify-center">
-        <p className="text-[#888] text-sm">Loading your form…</p>
+      <div className="min-h-screen bg-[#f5f5f0] flex items-center justify-center" style={{ fontFamily: 'Tahoma, sans-serif' }}>
+        <p className="text-[#888] text-xs">Loading your form…</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#f5f5f0] flex items-center justify-center px-4">
-        <div className="bg-white border border-[#e0e0e0] rounded-xl p-8 max-w-md text-center">
-          <h2 className="font-serif text-xl font-semibold mb-2 text-black">Invalid link</h2>
-          <p className="text-sm text-[#666]">This form link is invalid or has expired. Please contact the accounts section.</p>
+      <div className="min-h-screen bg-[#f5f5f0] flex items-center justify-center px-4" style={{ fontFamily: 'Tahoma, sans-serif' }}>
+        <div className="bg-white border border-[#e0e0e0] rounded-xl p-8 max-w-md text-center shadow-sm">
+          <h2 className="text-base font-bold mb-2 text-black">Invalid Link</h2>
+          <p className="text-xs text-[#666]">This form link is invalid or has expired. Please contact the accounts section.</p>
         </div>
       </div>
     );
   }
 
-  if (submitted) {
+  if (submitted || (meta && meta.formSubmitted)) {
+    const status = meta?.approvalStatus || "Pending Verification & Approval";
     return (
-      <div className="min-h-screen bg-[#f5f5f0] flex items-center justify-center px-4">
-        <div className="bg-white border border-[#e0e0e0] rounded-xl p-8 max-w-md text-center">
-          <div className="w-10 h-10 rounded-full bg-[#f0f0f0] border border-[#e0e0e0] flex items-center justify-center mx-auto mb-4">
-            <span className="text-black text-lg">✓</span>
+      <div className="min-h-screen bg-[#f5f5f0] flex items-center justify-center px-4" style={{ fontFamily: 'Tahoma, sans-serif' }}>
+        <div className="bg-white border border-[#e0e0e0] rounded-xl p-8 max-w-md text-center shadow-sm w-full">
+          <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center mx-auto mb-4 font-bold text-sm">
+            ✓
           </div>
-          <h2 className="font-serif text-xl font-semibold mb-2 text-black">Form submitted</h2>
-          <p className="text-sm text-[#666]">Your details have been received. The accounts section will process your payment shortly.</p>
+          <h2 className="text-base font-bold mb-2 text-black font-serif">Form Submitted</h2>
+          <p className="text-xs text-gray-500 mb-6">Your verification details and bank account have been successfully submitted.</p>
+          
+          <div className="bg-gray-50 rounded-lg p-4 mb-6 border border-gray-100 text-left">
+            <span className="text-[10px] font-bold uppercase text-gray-400 block mb-1">Current Status</span>
+            <span className="text-xs font-bold text-black">{status}</span>
+          </div>
+
+          <button
+            onClick={() => {
+              const link = window.location.href;
+              navigator.clipboard.writeText(link);
+              alert("Status link copied to clipboard!");
+            }}
+            className="w-full bg-black text-white text-xs font-bold py-3 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors shadow-sm"
+          >
+            Copy Status Link
+          </button>
         </div>
       </div>
     );
@@ -447,29 +467,29 @@ export default function FormPage() {
   const { services } = meta;
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] py-10 px-4">
+    <div className="min-h-screen bg-[#FAF9F6] py-10 px-4" style={{ fontFamily: 'Tahoma, sans-serif' }}>
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="bg-black text-white rounded-lg px-8 py-6 mb-6 relative shadow-sm">
           <div className="absolute top-6 right-8 gap-3 hidden sm:flex">
-            <div className="w-14 h-14 flex items-center justify-center">
+            <div className="w-12 h-12 flex items-center justify-center">
               <img src={logo} alt="AFMS Logo" className="w-full h-full object-contain filter invert" />
             </div>
-            <div className="w-14 h-14 flex items-center justify-center">
+            <div className="w-12 h-12 flex items-center justify-center">
               <img src={asssrLogo} alt="ASSSR Logo" className="w-full h-full object-contain filter invert" />
             </div>
           </div>
-          <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">{services}</p>
-          <h1 className="font-bold text-2xl">{SERVICE_LABELS[services] || services}</h1>
-          <p className="text-sm text-gray-300 mt-1 sm:pr-16">
+          <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">{services}</p>
+          <h1 className="font-bold text-xl">{SERVICE_LABELS[services] || services}</h1>
+          <p className="text-xs text-gray-300 mt-1 sm:pr-16">
             Payee Completion Form
           </p>
         </div>
 
         {/* Instructions */}
-        <div className="bg-white border-l-4 border-black px-6 py-4 mb-6 text-sm text-gray-700 shadow-sm">
-          <p>• Review the details of your claim below.</p>
-          <p>• Provide your bank details and PAN/Aadhaar to process payment.</p>
+        <div className="bg-white border-l-2 border-black px-6 py-4 mb-6 text-xs text-gray-700 shadow-sm rounded-r-lg">
+          <p className="mb-1">• Review the details of your claim below.</p>
+          <p className="mb-1">• Provide your bank details and PAN/Aadhaar to process payment.</p>
           <p>• Fields marked with <span className="text-black font-bold">*</span> are mandatory.</p>
         </div>
 

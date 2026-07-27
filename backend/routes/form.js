@@ -62,9 +62,16 @@ router.get("/:token", rateLimiter, async (req, res) => {
   try {
     const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }] });
     
-    // Hide details: same generic error if token doesn't exist, is completed, or is expired
-    if (!record || record.payee_status === "completed" || record.payee_status === "expired" || record.formSubmitted || new Date() > new Date(record.expiresAt)) {
+    // Allow completed or submitted records to be fetched to show status
+    if (!record || record.payee_status === "expired" || new Date() > new Date(record.expiresAt)) {
       return res.status(404).json({ message: "Invalid or expired link." });
+    }
+
+    let approvalStatus = "Pending Verification & Approval";
+    if (record.paymentProcessed) {
+      approvalStatus = "Payment Processed (Completed)";
+    } else if (record.adminApproved) {
+      approvalStatus = "Approved by Registrar, Pending Payment";
     }
 
     res.json({
@@ -76,6 +83,8 @@ router.get("/:token", rateLimiter, async (req, res) => {
       services: record.services,
       component: record.component,
       form_type: record.form_type,
+      formSubmitted: record.formSubmitted || false,
+      approvalStatus,
       honorarium_basis: record.honorarium_basis,
       num_presences: record.num_presences,
       rate: record.rate,
