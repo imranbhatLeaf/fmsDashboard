@@ -1,14 +1,22 @@
 const express = require("express");
 const router = express.Router();
 const Record = require("../models/Record");
+const { requireAuth, requireRole } = require("../utils/auth");
 
 // GET /api/records          -> all non-deleted records
 // GET /api/records?category=Salary  -> filtered by category
-router.get("/", async (req, res) => {
+// GET /api/records?component=ASSSR -> filtered by component (Req 18 fix)
+router.get("/", requireAuth, async (req, res) => {
   try {
-    const { category } = req.query;
+    const { category, component, adminApproved } = req.query;
     const filter = { isDeleted: { $ne: true } };
+    
     if (category) filter.category = category;
+    if (component) filter.component = component;
+    if (adminApproved !== undefined) {
+      filter.adminApproved = adminApproved === "true";
+    }
+    
     const records = await Record.find(filter).sort({ createdAt: -1 });
     res.json(records);
   } catch (err) {
@@ -16,9 +24,9 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST /api/records -> Create a single record entry
+// POST /api/records -> Create a single record entry (Admin-only)
 const { v4: uuidv4 } = require("uuid");
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, requireRole(["admin"]), async (req, res) => {
   try {
     const data = req.body;
 
@@ -35,17 +43,29 @@ router.post("/", async (req, res) => {
     if (data.component) data.component = data.component.toUpperCase();
     if (data.services) data.services = data.services.toUpperCase();
 
-    // Auto-generate some required fields if missing
-    data.row_id = data.row_id || `MANUAL_${Date.now()}`;
-    data.token = data.token || uuidv4();
-    data.payee_link_token = data.payee_link_token || require('crypto').randomBytes(32).toString('hex');
-    data.category = data.category || "Honorarium";
-    data.form_type = data.form_type || "honorarium";
-    data.services = data.services || "ASSSR";
-    data.component = data.component || "ASSSR";
-    data.designation = data.designation || "N/A";
-    data.address = data.address || "N/A";
-    data.phone_mobile = data.phone_mobile || "N/A";
+    // Auto-generate required fields if missing or null/empty
+    const requiredFallbacks = {
+      row_id: () => `MANUAL_${Date.now()}`,
+      token: () => uuidv4(),
+      payee_link_token: () => require("crypto").randomBytes(32).toString("hex"),
+      category: () => "Honorarium",
+      form_type: () => "honorarium",
+      services: () => "ASSSR",
+      component: () => "ASSSR",
+      designation: () => "N/A",
+      address: () => "N/A",
+      phone_mobile: () => "N/A"
+    };
+
+    for (const [key, getFallback] of Object.entries(requiredFallbacks)) {
+      if (data[key] === undefined || data[key] === null || data[key] === "") {
+        data[key] = getFallback();
+      }
+    }
+
+    // Set mandatory dates (Req 11)
+    data.dateOfEntry = new Date();
+    data.dateOfUpload = null; // manual entry has no upload date, or null
 
     // Recalculate TDS if amount is provided
     if (data.amount !== undefined && data.amount !== null) {
@@ -64,8 +84,8 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /api/records/recycle-bin -> soft-deleted records
-router.get("/recycle-bin", async (req, res) => {
+// GET /api/records/recycle-bin -> soft-deleted records (Registrar-only)
+router.get("/recycle-bin", requireAuth, requireRole(["registrar"]), async (req, res) => {
   try {
     const records = await Record.find({ isDeleted: true }).sort({ deletedAt: -1 });
     res.json(records);
@@ -74,8 +94,8 @@ router.get("/recycle-bin", async (req, res) => {
   }
 });
 
-// PUT /api/records/:id/restore -> restore a soft-deleted record
-router.put("/:id/restore", async (req, res) => {
+// PUT /api/records/:id/restore -> restore a soft-deleted record (Registrar-only)
+router.put("/:id/restore", requireAuth, requireRole(["registrar"]), async (req, res) => {
   try {
     const record = await Record.findById(req.params.id);
     if (!record) return res.status(404).json({ message: "Record not found" });
@@ -90,14 +110,15 @@ router.put("/:id/restore", async (req, res) => {
   }
 });
 
-// PUT /api/records/:id/approve
-router.put("/:id/approve", async (req, res) => {
+// PUT /api/records/:id/approve -> Registrar Approval (Registrar-only)
+router.put("/:id/approve", requireAuth, requireRole(["registrar"]), async (req, res) => {
   try {
     const record = await Record.findById(req.params.id);
     if (!record) return res.status(404).json({ message: "Record not found" });
     
     record.registrarApproved = true;
     record.registrarApprovedAt = new Date();
+    record.dateOfApproval = new Date(); // Req 11
     await record.save();
     
     res.json(record);
@@ -106,14 +127,15 @@ router.put("/:id/approve", async (req, res) => {
   }
 });
 
-// PUT /api/records/:id/admin-approve
-router.put("/:id/admin-approve", async (req, res) => {
+// PUT /api/records/:id/admin-approve -> Admin Approval/Forwarding (Admin-only)
+router.put("/:id/admin-approve", requireAuth, requireRole(["admin"]), async (req, res) => {
   try {
     const record = await Record.findById(req.params.id);
     if (!record) return res.status(404).json({ message: "Record not found" });
     
     record.adminApproved = true;
     record.adminApprovedAt = new Date();
+    record.dateOfForwarding = new Date(); // Req 11
     await record.save();
     
     res.json(record);
@@ -122,9 +144,9 @@ router.put("/:id/admin-approve", async (req, res) => {
   }
 });
 
-// PUT /api/records/:id/process
+// PUT /api/records/:id/process -> Process payment and generate receipt (Admin-only)
 // Requires bankReferenceNo and dateOfTransfer (Req 17)
-router.put("/:id/process", async (req, res) => {
+router.put("/:id/process", requireAuth, requireRole(["admin"]), async (req, res) => {
   try {
     const { bankReferenceNo, dateOfTransfer } = req.body;
 
@@ -163,7 +185,7 @@ router.put("/:id/process", async (req, res) => {
 });
 
 // PUT /api/records/:id/edit -> Admin-only edit of record data (Req 21)
-router.put("/:id/edit", async (req, res) => {
+router.put("/:id/edit", requireAuth, requireRole(["admin"]), async (req, res) => {
   try {
     const record = await Record.findById(req.params.id);
     if (!record) return res.status(404).json({ message: "Record not found" });
@@ -180,10 +202,25 @@ router.put("/:id/edit", async (req, res) => {
       "category", "services", "amount", "formData"
     ];
 
+    const editFallbacks = {
+      row_id: () => `MANUAL_${Date.now()}`,
+      component: () => "ASSSR",
+      form_type: () => "honorarium",
+      designation: () => "N/A",
+      address: () => "N/A",
+      phone_mobile: () => "N/A",
+      services: () => "ASSSR",
+      category: () => "Honorarium"
+    };
+
     for (const field of allowedFields) {
       if (updates[field] !== undefined) {
-        if (updates[field] === "") {
-          record[field] = null;
+        if (updates[field] === "" || updates[field] === null) {
+          if (editFallbacks[field]) {
+            record[field] = editFallbacks[field]();
+          } else {
+            record[field] = null;
+          }
         } else {
           record[field] = updates[field];
         }
@@ -212,8 +249,8 @@ router.put("/:id/edit", async (req, res) => {
   }
 });
 
-// DELETE /api/records/:id -> Soft delete (Req 18, 19)
-router.delete("/:id", async (req, res) => {
+// DELETE /api/records/:id -> Soft delete (Registrar-only) (Req 16, 18, 19)
+router.delete("/:id", requireAuth, requireRole(["registrar"]), async (req, res) => {
   try {
     const record = await Record.findById(req.params.id);
     if (!record) return res.status(404).json({ message: "Record not found" });

@@ -14,7 +14,10 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState("");
+  const queryParams = new URLSearchParams(window.location.search);
+  const roleParam = queryParams.get("role");
+
+  const [username, setUsername] = useState(roleParam || "");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading]   = useState(false);
@@ -33,7 +36,7 @@ export default function Login() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Login failed.");
 
-      login({ username: data.username, role: data.role });
+      login({ username: data.username, role: data.role, token: data.token });
       navigate(data.role === "admin" ? "/admin" : "/registrar");
     } catch (err) {
       setError(err.message);

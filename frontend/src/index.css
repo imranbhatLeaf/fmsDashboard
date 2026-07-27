@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: Tahoma, Geneva, Verdana, sans-serif;
+  --font-serif: Tahoma, Geneva, Verdana, sans-serif;
+}
+
 @layer base {
   body {
-    font-family: Tahoma, sans-serif;
+    font-family: Tahoma, Geneva, Verdana, sans-serif;
     background-color: #FAF9F6;
     color: black;
   }

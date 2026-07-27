@@ -57,9 +57,12 @@ export default function AdminDashboard() {
 
   async function handleAdminApprove(id) {
     try {
-      const res = await fetch(`${API_BASE}/api/records/${id}/admin-approve`, { method: "PUT" });
+      const res = await fetch(`${API_BASE}/api/records/${id}/admin-approve`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${auth?.token}` }
+      });
       if (!res.ok) throw new Error("Approval failed");
-      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, adminApproved: true, adminApprovedAt: new Date() } : r));
+      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, adminApproved: true, adminApprovedAt: new Date(), dateOfForwarding: new Date() } : r));
     } catch (err) {
       alert(err.message);
     }
@@ -87,7 +90,10 @@ export default function AdminDashboard() {
     try {
       const res = await fetch(`${API_BASE}/api/records/${processRecordId}/process`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${auth?.token}`
+        },
         body: JSON.stringify({
           bankReferenceNo: processBankRef.trim(),
           dateOfTransfer: processDateOfTransfer,
@@ -99,8 +105,8 @@ export default function AdminDashboard() {
         ...r,
         paymentProcessed: true,
         paymentProcessedAt: new Date(),
-        bankReferenceNo: processBankRef.trim(),
         dateOfTransfer: processDateOfTransfer,
+        bankReferenceNo: processBankRef.trim(),
         receiptNumber: data.receiptNumber || r.receiptNumber,
       } : r));
       setShowProcessModal(false);
@@ -110,7 +116,7 @@ export default function AdminDashboard() {
   }
 
   function copyLink(token) {
-    const link = `${window.location.origin}/form/${token}`;
+    const link = `https://finance.asssr.org/form/${token}`;
     navigator.clipboard.writeText(link);
     alert("Link copied!");
   }
@@ -136,7 +142,10 @@ export default function AdminDashboard() {
 
     const res = await fetch(url, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${auth?.token}`
+      },
       body: JSON.stringify(formData),
     });
     const data = await res.json();
@@ -173,7 +182,8 @@ export default function AdminDashboard() {
   const [processDateOfTransfer, setProcessDateOfTransfer] = useState("");
   const [processError, setProcessError] = useState("");
 
-
+  // Excel sorting configuration
+  const [sortConfig, setSortConfig] = useState({ key: "dateOfEntry", direction: "desc" });
 
   const fetchRecords = useCallback(async () => {
     if (view === "upload") return;
@@ -181,7 +191,9 @@ export default function AdminDashboard() {
     setRecordsError(null);
     try {
       const query = view === "all" ? "" : `?category=${encodeURIComponent(view)}`;
-      const res = await fetch(`${API_BASE}/api/records${query}`);
+      const res = await fetch(`${API_BASE}/api/records${query}`, {
+        headers: { Authorization: `Bearer ${auth?.token}` }
+      });
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
       const data = await res.json();
       setRecords(Array.isArray(data) ? data : data.records || []);
@@ -190,7 +202,7 @@ export default function AdminDashboard() {
     } finally {
       setRecordsLoading(false);
     }
-  }, [view]);
+  }, [view, auth?.token]);
 
   useEffect(() => {
     fetchRecords();
@@ -223,6 +235,7 @@ export default function AdminDashboard() {
       formData.append("file", file);
       const res = await fetch(`${API_BASE}/api/upload`, {
         method: "POST",
+        headers: { Authorization: `Bearer ${auth?.token}` },
         body: formData,
       });
       const data = await res.json();
@@ -243,7 +256,66 @@ export default function AdminDashboard() {
         : "text-white/65 hover:bg-white/10 hover:text-white"
     }`;
 
-  const fmtDate = (d) => d ? new Date(d).toLocaleDateString() : "-";
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN") : "—";
+
+  // Excel sorting functions
+  const handleSort = (key) => {
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getRecordStatus = (r) => {
+    if (r.paymentProcessed) return "Paid";
+    if (r.registrarApproved) return "Ready for Payment";
+    if (r.adminApproved) return "Needs Registrar Approval";
+    if (r.formSubmitted) return "Needs Admin Approval";
+    return "Form Pending";
+  };
+
+  const getFieldValue = (r, key) => {
+    switch (key) {
+      case "name": return r.name || "";
+      case "services": return r.services || "";
+      case "category": return r.category || "";
+      case "amount": return Number(r.amount) || 0;
+      case "amountAfterTds": return r.amountAfterTds ? Number(r.amountAfterTds) : Number(r.amount * 0.9) || 0;
+      case "dateOfEntry": return new Date(r.dateOfEntry || r.createdAt).getTime();
+      case "dateOfUpload": return r.dateOfUpload ? new Date(r.dateOfUpload).getTime() : 0;
+      case "dateOfForwarding": return r.dateOfForwarding || r.adminApprovedAt ? new Date(r.dateOfForwarding || r.adminApprovedAt).getTime() : 0;
+      case "dateOfApproval": return r.dateOfApproval || r.registrarApprovedAt ? new Date(r.dateOfApproval || r.registrarApprovedAt).getTime() : 0;
+      case "dateOfTransfer": return r.dateOfTransfer ? new Date(r.dateOfTransfer).getTime() : 0;
+      case "status": return getRecordStatus(r);
+      case "utrn": return r.receiptNumber || r.token?.split("-")[0].toUpperCase() || "";
+      default: return "";
+    }
+  };
+
+  const sortedRecords = [...records].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    const aVal = getFieldValue(a, sortConfig.key);
+    const bVal = getFieldValue(b, sortConfig.key);
+    if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const renderSortableHeader = (label, key, isRight = false) => {
+    const isSorted = sortConfig.key === key;
+    return (
+      <th
+        onClick={() => handleSort(key)}
+        className={`px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 cursor-pointer select-none ${isRight ? "text-right" : ""}`}
+      >
+        <div className={`flex items-center gap-1 ${isRight ? "justify-end" : ""}`}>
+          {label}
+          {isSorted ? (sortConfig.direction === "asc" ? " ↑" : " ↓") : " ↕"}
+        </div>
+      </th>
+    );
+  };
 
   return (
     <div className="flex flex-col min-h-screen font-sans" style={{ background: "#FAF9F6" }}>
@@ -255,7 +327,7 @@ export default function AdminDashboard() {
         {/* Brand */}
         <div className="flex flex-col gap-0.5 px-2 border-r border-white/15 shrink-0 mr-4 pr-6">
           <span className="text-xl font-bold tracking-wide text-white" style={{ fontFamily: "Tahoma, Geneva, sans-serif" }}>AFMS</span>
-          <span className="text-[10px] text-white/50">Admin Panel</span>
+          <span className="text-[10px] text-white/50 font-bold">Admin Panel</span>
         </div>
 
         {/* Nav */}
@@ -289,7 +361,7 @@ export default function AdminDashboard() {
         {/* Sign-out */}
         <div className="flex flex-row items-center gap-4 border-l border-white/15 pl-6 shrink-0">
           <span className="text-[10px] text-white/40 hidden md:block">
-            Signed in as <span className="text-white/80">{auth?.username}</span>
+            Signed in as <span className="text-white/80 font-bold">Admin</span>
           </span>
           <button
             onClick={handleResetPassword}
@@ -390,8 +462,8 @@ export default function AdminDashboard() {
 
         ) : (
           /* ── Transaction records view ── */
-          <section>
-            <header className="mb-8">
+          <section className="w-full">
+            <header className="mb-4">
               <h1 className="font-serif text-2xl font-bold flex items-center gap-2.5 mb-1.5" style={{ color: DB }}>
                 {view === "all" ? "Financial Records" : view}
               </h1>
@@ -415,75 +487,81 @@ export default function AdminDashboard() {
             )}
 
             {!recordsLoading && !recordsError && records.length > 0 && (
-                <div className="w-full overflow-x-auto bg-white rounded-lg shadow-sm border border-gray-200">
-                  <table className="w-full border-collapse text-sm text-left whitespace-nowrap">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                <div className="w-full bg-white border border-gray-300 overflow-x-hidden">
+                  <table className="w-full border-collapse text-left" style={{ fontSize: "11px" }}>
+                    <thead>
                       <tr>
-                        {["Name", "UTRN", "Amount", "After TDS", "Action"].map((h) => (
-                          <th
-                            key={h}
-                            className={`text-[11px] font-bold uppercase tracking-wider text-gray-500 py-3 px-4 ${
-                              (h === "Amount" || h === "After TDS") ? "text-right" : ""
-                            }`}
-                          >
-                            {h}
-                          </th>
-                        ))}
+                        {renderSortableHeader("Name", "name")}
+                        {renderSortableHeader("Comp", "services")}
+                        {renderSortableHeader("Category", "category")}
+                        {renderSortableHeader("Amount", "amount", true)}
+                        {renderSortableHeader("After TDS", "amountAfterTds", true)}
+                        {renderSortableHeader("Uploaded", "dateOfUpload")}
+                        {renderSortableHeader("Forwarded", "dateOfForwarding")}
+                        {renderSortableHeader("Approved", "dateOfApproval")}
+                        {renderSortableHeader("Transferred", "dateOfTransfer")}
+                        {renderSortableHeader("UTRN", "utrn")}
+                        {renderSortableHeader("Status", "status")}
+                        <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {records.map((r) => {
-                        let status = "Form Pending";
-                        if (r.formSubmitted) status = "Needs Admin Approval";
-                        if (r.adminApproved) status = "Needs Registrar Approval";
-                        if (r.registrarApproved) status = "Ready for Payment";
-                        if (r.paymentProcessed) status = "Paid";
+                    <tbody>
+                      {sortedRecords.map((r) => {
+                        const status = getRecordStatus(r);
                         
                         return (
                         <tr
                           key={r._id || r.email}
-                          className="hover:bg-gray-50 transition-colors"
+                          className="hover:bg-gray-50 transition-colors border-b border-gray-300"
                         >
-                          <td className="py-2 px-4 font-medium text-gray-800">{r.name}</td>
-                          <td className="py-2 px-4 text-gray-500 font-mono text-xs">{r.receiptNumber || r.token?.split("-")[0].toUpperCase() || "—"}</td>
-                          <td className="py-2 px-4 text-right font-mono text-gray-700">
+                          <td className="px-0.5 py-1 border-r border-gray-300 font-medium text-gray-800">{r.name}</td>
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600">{r.services}</td>
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600">{r.category}</td>
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-right font-mono text-gray-700">
                             {Number(r.amount).toLocaleString("en-IN")}
                           </td>
-                          <td className="py-2 px-4 text-right font-mono text-gray-700">
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-right font-mono text-gray-700">
                             {r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString("en-IN") : (r.category === "Refund" || r.category === "TA/DA" ? Number(r.amount).toLocaleString("en-IN") : Number(r.amount * 0.9).toLocaleString("en-IN"))}
                           </td>
-                          <td className="py-2 px-4">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span
-                                className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded border"
-                                style={
-                                  status === "Paid"
-                                    ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
-                                    : status === "Ready for Payment" || status === "Needs Admin Approval"
-                                    ? { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
-                                    : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
-                                }
-                              >
-                                {status}
-                              </span>
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfUpload || r.dateOfEntry || r.createdAt)}</td>
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfForwarding || r.adminApprovedAt)}</td>
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfApproval || r.registrarApprovedAt)}</td>
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfTransfer)}</td>
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-500 font-mono text-[11px]">{r.receiptNumber || r.token?.split("-")[0].toUpperCase() || "—"}</td>
+                          <td className="px-0.5 py-1 border-r border-gray-300">
+                            <span
+                              className="inline-block text-[9px] font-bold uppercase tracking-wider px-1 py-0.2 rounded border"
+                              style={
+                                status === "Paid"
+                                  ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
+                                  : status === "Ready for Payment" || status === "Needs Admin Approval"
+                                  ? { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
+                                  : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
+                              }
+                            >
+                              {status}
+                            </span>
+                          </td>
+                          <td className="px-0.5 py-1">
+                            <div className="flex items-center gap-0.5 flex-wrap">
                               <button
                                 onClick={() => openRecordModal(r)}
-                                className="text-[10px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-3 py-1.5 rounded-md transition-colors shadow-sm"
+                                className="text-[9px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-1 py-0.2 rounded transition-colors shadow-sm bg-white"
                               >
-                                Preview / Edit
+                                Edit
                               </button>
                               {status === "Form Pending" && (
                                 <button
                                   onClick={() => copyLink(r.token)}
-                                  className="text-[10px] font-bold uppercase tracking-wider text-black bg-gray-200 hover:bg-gray-300 px-3 py-1.5 rounded-md transition-colors"
+                                  className="text-[9px] font-bold uppercase tracking-wider text-black bg-gray-200 hover:bg-gray-300 px-1 py-0.2 rounded transition-colors"
                                 >
-                                  Copy Link
+                                  Link
                                 </button>
                               )}
                               {status === "Needs Admin Approval" && (
                                 <button
                                   onClick={() => handleAdminApprove(r._id)}
-                                  className="text-[10px] font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-md transition-colors shadow-sm"
+                                  className="text-[9px] font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 px-1 py-0.2 rounded transition-colors shadow-sm"
                                 >
                                   Approve
                                 </button>
@@ -491,7 +569,7 @@ export default function AdminDashboard() {
                               {status === "Ready for Payment" && (
                                 <button
                                   onClick={() => handleProcess(r._id)}
-                                  className="text-[10px] font-bold uppercase tracking-wider text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-md transition-colors shadow-sm"
+                                  className="text-[9px] font-bold uppercase tracking-wider text-white bg-green-600 hover:bg-green-700 px-1 py-0.2 rounded transition-colors shadow-sm"
                                 >
                                   Process
                                 </button>
@@ -499,20 +577,18 @@ export default function AdminDashboard() {
                               {status === "Paid" && (
                                 <button
                                   onClick={() => window.open(`/receipt/${r.token}`, '_blank')}
-                                  className="text-[10px] font-bold uppercase tracking-wider text-white bg-black hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors shadow-sm"
+                                  className="text-[9px] font-bold uppercase tracking-wider text-white bg-black hover:bg-gray-800 px-1 py-0.2 rounded transition-colors shadow-sm"
                                 >
                                   Receipt
                                 </button>
                               )}
-
-                              {/* Req 16: Delete button removed from Admin — only Registrar can delete */}
                             </div>
                           </td>
                         </tr>
                       )})}
-                  </tbody>
-                </table>
-              </div>
+                    </tbody>
+                  </table>
+                </div>
             )}
           </section>
         )}

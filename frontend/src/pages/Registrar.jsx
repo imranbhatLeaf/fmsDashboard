@@ -20,23 +20,21 @@ export default function Registrar() {
   const [records, setRecords]               = useState([]);
   const [loading, setLoading]               = useState(false);
   const [error, setError]                   = useState(null);
-  const [sortConfig, setSortConfig]         = useState({ key: null, direction: 'asc' });
-  const [previewRecord, setPreviewRecord]   = useState(null);
-
-  // Recycle bin state (Req 19)
-  const [showRecycleBin, setShowRecycleBin] = useState(false);
-  const [recycleBinRecords, setRecycleBinRecords] = useState([]);
-  const [recycleBinLoading, setRecycleBinLoading] = useState(false);
-
-  // Summary counts
+  const [sortConfig, setSortConfig] = useState({ key: "dateOfEntry", direction: "desc" });
   const [summary, setSummary] = useState({ total: 0, sent: 0, pending: 0, failed: 0 });
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
+  const [recycleBinLoading, setRecycleBinLoading] = useState(false);
+  const [recycleBinRecords, setRecycleBinRecords] = useState([]);
+  const [previewRecord, setPreviewRecord] = useState(null);
 
   const fetchRecords = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const query = activeCategory === "all" ? "" : `?component=${encodeURIComponent(activeCategory)}`;
-      const res = await fetch(`${API_BASE}/api/records${query}`);
+      const query = activeCategory === "all" ? "?adminApproved=true" : `?adminApproved=true&component=${encodeURIComponent(activeCategory)}`;
+      const res = await fetch(`${API_BASE}/api/records${query}`, {
+        headers: { Authorization: `Bearer ${auth?.token}` }
+      });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
       const list = Array.isArray(data) ? data : data.records || [];
@@ -52,7 +50,7 @@ export default function Registrar() {
     } finally {
       setLoading(false);
     }
-  }, [activeCategory]);
+  }, [activeCategory, auth?.token]);
 
   useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
@@ -60,7 +58,9 @@ export default function Registrar() {
   async function fetchRecycleBin() {
     setRecycleBinLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/records/recycle-bin`);
+      const res = await fetch(`${API_BASE}/api/records/recycle-bin`, {
+        headers: { Authorization: `Bearer ${auth?.token}` }
+      });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
       setRecycleBinRecords(Array.isArray(data) ? data : []);
@@ -81,7 +81,10 @@ export default function Registrar() {
   // Restore a soft-deleted record (Req 19)
   async function handleRestore(id) {
     try {
-      const res = await fetch(`${API_BASE}/api/records/${id}/restore`, { method: "PUT" });
+      const res = await fetch(`${API_BASE}/api/records/${id}/restore`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${auth?.token}` }
+      });
       if (!res.ok) throw new Error("Restore failed");
       setRecycleBinRecords((prev) => prev.filter((r) => r._id !== id));
       fetchRecords(); // refresh main list
@@ -121,9 +124,12 @@ export default function Registrar() {
 
   async function handleApprove(id) {
     try {
-      const res = await fetch(`${API_BASE}/api/records/${id}/approve`, { method: "PUT" });
+      const res = await fetch(`${API_BASE}/api/records/${id}/approve`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${auth?.token}` }
+      });
       if (!res.ok) throw new Error("Approval failed");
-      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, registrarApproved: true } : r));
+      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, registrarApproved: true, dateOfApproval: new Date() } : r));
     } catch (err) {
       alert(err.message);
     }
@@ -133,7 +139,10 @@ export default function Registrar() {
   async function handleDelete(id) {
     if (!window.confirm("Are you sure you want to delete this record? It will be moved to the Recycle Bin for 30 days.")) return;
     try {
-      const res = await fetch(`${API_BASE}/api/records/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/api/records/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${auth?.token}` }
+      });
       if (!res.ok) throw new Error("Deletion failed");
       setRecords((prev) => prev.filter((r) => r._id !== id));
     } catch (err) {
@@ -141,25 +150,67 @@ export default function Registrar() {
     }
   }
 
+  // Excel sorting functions
   const handleSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
     setSortConfig({ key, direction });
+  };
+
+  const getRecordStatus = (r) => {
+    if (r.paymentProcessed) return "Paid";
+    if (r.registrarApproved) return "Approved";
+    if (r.adminApproved) return "Needs Registrar Approval";
+    if (r.formSubmitted) return "Needs Admin Approval";
+    return "Form Pending";
+  };
+
+  const getFieldValue = (r, key) => {
+    switch (key) {
+      case "name": return r.name || "";
+      case "services": return r.services || "";
+      case "category": return r.category || "";
+      case "amount": return Number(r.amount) || 0;
+      case "amountAfterTds": return r.amountAfterTds ? Number(r.amountAfterTds) : Number(r.amount * 0.9) || 0;
+      case "dateOfEntry": return new Date(r.dateOfEntry || r.createdAt).getTime();
+      case "dateOfUpload": return r.dateOfUpload ? new Date(r.dateOfUpload).getTime() : 0;
+      case "dateOfForwarding": return r.dateOfForwarding || r.adminApprovedAt ? new Date(r.dateOfForwarding || r.adminApprovedAt).getTime() : 0;
+      case "dateOfApproval": return r.dateOfApproval || r.registrarApprovedAt ? new Date(r.dateOfApproval || r.registrarApprovedAt).getTime() : 0;
+      case "dateOfTransfer": return r.dateOfTransfer ? new Date(r.dateOfTransfer).getTime() : 0;
+      case "status": return getRecordStatus(r);
+      case "utrn": return r.receiptNumber || r.token?.split("-")[0].toUpperCase() || "";
+      default: return "";
+    }
   };
 
   const sortedRecords = [...records].sort((a, b) => {
     if (!sortConfig.key) return 0;
-    
-    let aVal = sortConfig.key === 'year' ? new Date(a.createdAt || Date.now()).getFullYear() : a.services;
-    let bVal = sortConfig.key === 'year' ? new Date(b.createdAt || Date.now()).getFullYear() : b.services;
-    
-    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+    const aVal = getFieldValue(a, sortConfig.key);
+    const bVal = getFieldValue(b, sortConfig.key);
+    if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
     return 0;
   });
 
+  const renderSortableHeader = (label, key, isRight = false) => {
+    const isSorted = sortConfig.key === key;
+    return (
+      <th
+        onClick={() => handleSort(key)}
+        className={`px-3 py-2 border border-gray-300 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 cursor-pointer select-none ${isRight ? "text-right" : ""}`}
+      >
+        <div className={`flex items-center gap-1 ${isRight ? "justify-end" : ""}`}>
+          {label}
+          {isSorted ? (sortConfig.direction === "asc" ? " ↑" : " ↓") : " ↕"}
+        </div>
+      </th>
+    );
+  };
+
   const totalAmount = records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-  const fmtDate = (d) => d ? new Date(d).toLocaleDateString() : "-";
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN") : "—";
 
   return (
     <div className="min-h-screen font-sans flex flex-col" style={{ background: "#FAF9F6", color: "black" }}>
@@ -182,12 +233,12 @@ export default function Registrar() {
           <div>
             <span className="text-lg font-bold" style={{ color: DB, fontFamily: "Tahoma, Geneva, sans-serif" }}>AFMS</span>
             <span className="hidden md:inline text-[#ccc] mx-2">·</span>
-            <span className="hidden md:inline text-xs text-[#99a] uppercase tracking-widest">Registrar View</span>
+            <span className="hidden md:inline text-xs text-[#99a] uppercase tracking-widest font-bold">Registrar View</span>
           </div>
         </div>
         <div className="flex items-center gap-4">
           <span className="hidden md:block text-xs text-[#aab]">
-            Signed in as <span className="font-semibold" style={{ color: DB }}>{auth?.username}</span>
+            Signed in as <span className="font-semibold" style={{ color: DB }}>Registrar</span>
           </span>
           <button
             onClick={handleResetPassword}
@@ -210,7 +261,7 @@ export default function Registrar() {
         </div>
       </header>
 
-      <main className="px-6 md:px-10 py-8 max-w-5xl">
+      <main className="px-6 md:px-10 py-8 max-w-7xl w-full mx-auto">
 
         {/* Page title */}
         <div className="mb-8">
@@ -354,23 +405,6 @@ export default function Registrar() {
           </section>
         ) : (
           <>
-            {/* Sort controls */}
-            <div className="flex gap-2 mb-4">
-              <span className="text-sm text-[#556] mr-2">Sort by:</span>
-              <button 
-                onClick={() => handleSort('services')} 
-                className="text-xs px-3 py-1 rounded border hover:bg-gray-50 transition-colors"
-              >
-                Component {sortConfig.key === 'services' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-              </button>
-              <button 
-                onClick={() => handleSort('year')} 
-                className="text-xs px-3 py-1 rounded border hover:bg-gray-50 transition-colors"
-              >
-                Year {sortConfig.key === 'year' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-              </button>
-            </div>
-
             {/* Table */}
             {loading && <p className="text-sm" style={{ color: "#aab" }}>Loading transactions…</p>}
             {error && (
@@ -380,67 +414,65 @@ export default function Registrar() {
               <p className="text-sm" style={{ color: "#aab" }}>No transactions found for this category.</p>
             )}
             {!loading && !error && records.length > 0 && (
-              <div className="w-full overflow-x-auto bg-white rounded-lg shadow-sm border border-gray-200">
-                <table className="w-full border-collapse text-sm text-left whitespace-nowrap">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+              <div className="w-full overflow-x-auto bg-white border border-gray-300">
+                <table className="w-full border-collapse text-left whitespace-nowrap" style={{ fontSize: "11px" }}>
+                  <thead>
                     <tr>
-                      {["Name", "UTRN", "Amount", "After TDS", "Action"].map((h) => (
-                        <th
-                          key={h}
-                          className={`text-[11px] font-bold uppercase tracking-wider text-gray-500 py-3 px-4 ${
-                            (h === "Amount" || h === "After TDS") ? "text-right" : ""
-                          }`}
-                        >
-                          {h}
-                        </th>
-                      ))}
+                      {renderSortableHeader("Name", "name")}
+                      {renderSortableHeader("Component", "services")}
+                      {renderSortableHeader("Category", "category")}
+                      {renderSortableHeader("Amount", "amount", true)}
+                      {renderSortableHeader("After TDS", "amountAfterTds", true)}
+                      {renderSortableHeader("UTRN", "utrn")}
+                      {renderSortableHeader("Status", "status")}
+                      <th className="px-2 py-1 border border-gray-300 text-xs font-bold text-gray-700 bg-gray-100">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody>
                     {sortedRecords.map((r) => {
-                      let status = "Form Pending";
-                      if (r.formSubmitted) status = "Needs Admin Approval";
-                      if (r.adminApproved) status = "Needs Registrar Approval";
-                      if (r.registrarApproved) status = "Approved";
-                      if (r.paymentProcessed) status = "Paid";
+                      const status = getRecordStatus(r);
                       
                       return (
                         <tr
                           key={r._id || r.email}
-                          className="hover:bg-gray-50 transition-colors"
+                          className="hover:bg-gray-50 transition-colors border-b border-gray-300"
                         >
-                          <td className="py-2 px-4 font-medium text-gray-800">{r.name}</td>
-                          <td className="py-2 px-4 text-gray-500 font-mono text-xs">{r.receiptNumber || r.token?.split("-")[0].toUpperCase() || "—"}</td>
-                          <td className="py-2 px-4 text-right font-mono text-gray-700">
+                          <td className="px-2 py-1 border-r border-gray-300 font-medium text-gray-800">{r.name}</td>
+                          <td className="px-2 py-1 border-r border-gray-300 text-gray-600">{r.services}</td>
+                          <td className="px-2 py-1 border-r border-gray-300 text-gray-600">{r.category}</td>
+                          <td className="px-2 py-1 border-r border-gray-300 text-right font-mono text-gray-700">
                             ₹{Number(r.amount).toLocaleString("en-IN")}
                           </td>
-                          <td className="py-2 px-4 text-right font-mono text-gray-700">
+                          <td className="px-2 py-1 border-r border-gray-300 text-right font-mono text-gray-700">
                             ₹{r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString("en-IN") : (r.category === "Refund" || r.category === "TA/DA" ? Number(r.amount).toLocaleString("en-IN") : Number(r.amount * 0.9).toLocaleString("en-IN"))}
                           </td>
-                          <td className="py-2 px-4">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span
-                                className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded border"
-                                style={
-                                  status === "Approved" || status === "Paid"
-                                    ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
-                                    : status === "Needs Registrar Approval"
-                                    ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
-                                    : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
-                                }
-                              >
-                                {status}
-                              </span>
+                          <td className="px-2 py-1 border-r border-gray-300 text-gray-500 font-mono text-xs">{r.receiptNumber || r.token?.split("-")[0].toUpperCase() || "—"}</td>
+                          <td className="px-2 py-1 border-r border-gray-300">
+                            <span
+                              className="inline-block text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
+                              style={
+                                status === "Approved" || status === "Paid"
+                                  ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
+                                  : status === "Needs Registrar Approval"
+                                  ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
+                                  : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
+                              }
+                            >
+                              {status}
+                            </span>
+                          </td>
+                          <td className="px-2 py-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <button
                                 onClick={() => setPreviewRecord(r)}
-                                className="text-[10px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-3 py-1.5 rounded-md transition-colors shadow-sm"
+                                className="text-[9px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-2 py-0.5 rounded transition-colors shadow-sm bg-white"
                               >
                                 Preview
                               </button>
                               {status === "Needs Registrar Approval" && (
                                 <button
                                   onClick={() => handleApprove(r._id)}
-                                  className="text-[10px] font-bold uppercase tracking-wider text-white px-3 py-1.5 rounded-md transition-colors shadow-sm"
+                                  className="text-[9px] font-bold uppercase tracking-wider text-white px-2 py-0.5 rounded transition-colors shadow-sm"
                                   style={{ background: DB }}
                                   onMouseEnter={(e) => (e.currentTarget.style.background = "#333")}
                                   onMouseLeave={(e) => (e.currentTarget.style.background = DB)}
@@ -451,7 +483,7 @@ export default function Registrar() {
                               {/* Req 16: Delete button — limited to Registrar only */}
                               <button
                                 onClick={() => handleDelete(r._id)}
-                                className="text-[10px] font-bold uppercase tracking-wider text-red-600 px-3 py-1.5 rounded-md border border-red-200 transition-colors hover:bg-red-50"
+                                className="text-[9px] font-bold uppercase tracking-wider text-red-600 px-2 py-0.5 rounded border border-red-200 transition-colors hover:bg-red-50 bg-white"
                               >
                                 Delete
                               </button>

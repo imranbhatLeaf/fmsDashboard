@@ -5,6 +5,7 @@ const multer = require("multer");
 const csv = require("csv-parser");
 const { Readable } = require("stream");
 const Record = require("../models/Record");
+const { requireAuth, requireRole } = require("../utils/auth");
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -168,7 +169,7 @@ function validateRow(row, rowNum) {
   return { isValid: true };
 }
 
-router.post("/", upload.single("file"), async (req, res) => {
+router.post("/", requireAuth, requireRole(["admin"]), upload.single("file"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: "No file uploaded." });
   }
@@ -274,6 +275,10 @@ router.post("/", upload.single("file"), async (req, res) => {
             payee_status: "pending",
             payee_link_token,
             
+            // Explicit Date Fields (Req 11)
+            dateOfEntry: new Date(),
+            dateOfUpload: new Date(),
+
             // Backward compatibility
             services,
             category,

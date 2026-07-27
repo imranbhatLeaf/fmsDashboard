@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 const CSV_FIELDS = [
-  "row_id", "component", "form_type", "name", "designation", "pay_level", "address", 
+  "component", "form_type", "name", "designation", "pay_level", "address", 
   "phone_office", "phone_mobile", "email", "programme_nature", "programme_title", 
   "participation_type", "lecture_type", "honorarium_basis", "num_presences", "rate", 
   "total_amount", "journey_from", "journey_to", "journey_mode", "journey_amount", 
@@ -44,7 +44,18 @@ export default function RecordModal({ record, onClose, onSave }) {
           <div className="flex items-center gap-2">
             {!isAdd && !isEditing && (
               <>
-                <button onClick={() => window.print()} className="text-[10px] font-bold uppercase tracking-wider text-white bg-black hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors print:hidden">Print</button>
+                <button
+                  onClick={() => {
+                    if (!formData.bankReferenceNo || !formData.dateOfTransfer) {
+                      alert("Receipt cannot be generated or printed without Bank Reference Number and Date of Transfer.");
+                      return;
+                    }
+                    window.open(`/receipt/${formData.token}`, '_blank');
+                  }}
+                  className="text-[10px] font-bold uppercase tracking-wider text-white bg-black hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors print:hidden"
+                >
+                  Print Receipt
+                </button>
                 {onSave && (
                   <button onClick={() => setIsEditing(true)} className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 px-3 py-1.5 rounded-md transition-colors print:hidden">Edit</button>
                 )}

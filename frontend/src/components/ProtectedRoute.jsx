@@ -18,7 +18,7 @@ export default function ProtectedRoute({ children, requiredRole }) {
   if (requiredRole && auth.role !== requiredRole) {
     // Wrong role — redirect to their correct dashboard
     setTimeout(() => {
-      navigate(auth.role === "admin" ? "/admin" : "/treasurer", { replace: true });
+      navigate(auth.role === "admin" ? "/admin" : "/registrar", { replace: true });
     }, 0);
     return null;
   }

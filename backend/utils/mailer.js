@@ -17,7 +17,7 @@ function getBody(doc) {
   const amount = Number(doc.amount).toLocaleString("en-IN");
   const net = Number(doc.amountAfterTds).toLocaleString("en-IN");
   const tds = (Number(doc.amount) - Number(doc.amountAfterTds)).toLocaleString("en-IN");
-  const formLink = `http://51.79.173.103:5173/form/${doc.token}`;
+  const formLink = `https://finance.asssr.org/form/${doc.token}`;
 
   const footer = `If you have any queries, please contact the accounts section.\n\nRegards,\nFinance & Accounts Team\n${service}`;
 

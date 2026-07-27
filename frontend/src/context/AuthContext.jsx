@@ -14,7 +14,9 @@ export function AuthProvider({ children }) {
   });
 
   useEffect(() => {
-    if (auth && auth.token) {
+    if (!auth || !auth.token) return;
+
+    const checkSession = () => {
       fetch(`${API_BASE}/api/auth/verify`, {
         headers: { Authorization: `Bearer ${auth.token}` }
       })
@@ -22,7 +24,12 @@ export function AuthProvider({ children }) {
         if (!res.ok) logout();
       })
       .catch(() => logout());
-    }
+    };
+
+    checkSession();
+
+    const interval = setInterval(checkSession, 5000);
+    return () => clearInterval(interval);
   }, [auth?.token]);
 
   function login(userData) {

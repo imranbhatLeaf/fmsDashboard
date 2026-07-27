@@ -32,6 +32,9 @@ router.get("/receipt/:token", rateLimiter, async (req, res) => {
     const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }] });
     if (!record) return res.status(404).json({ message: "Not found." });
     if (!record.formSubmitted) return res.status(403).json({ message: "Form not yet submitted." });
+    if (!record.bankReferenceNo || !record.dateOfTransfer) {
+      return res.status(403).json({ message: "Receipt cannot be generated without Bank Reference Number and Date of Transfer." });
+    }
 
     // Audit log read of PII
     if (record.pan_number || record.aadhaar_number) {

@@ -133,6 +133,14 @@ export default function ReceiptPage() {
   // Receipt number: service prefix + year + 4-digit seq, fallback to token
   const utrn = record.receiptNumber || record.token.split("-")[0].toUpperCase();
 
+  function formatIP(ip) {
+    if (!ip) return "127.0.0.1";
+    let cleanIp = ip.split(",")[0].trim();
+    if (cleanIp === "::1") return "127.0.0.1";
+    if (cleanIp.startsWith("::ffff:")) return cleanIp.substring(7);
+    return cleanIp;
+  }
+
   return (
     <div className="min-h-screen bg-white py-10 px-4">
       {/* Print button */}
@@ -154,14 +162,17 @@ export default function ReceiptPage() {
         </div>
 
         {/* Receipt title */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-start mb-6">
           <div>
             <p className="font-bold">{record.category} Receipt</p>
             <p className="text-sm">For Record Purposes Against Payments Made</p>
           </div>
-          <div className="text-right">
-            <p className="text-sm font-bold">Unique Transaction Reference Number (UTRN)</p>
-            <p className="font-mono">{utrn}</p>
+          <div className="text-right flex flex-col items-end">
+            <p className="text-xs font-bold">Unique Transaction Reference Number</p>
+            <p className="font-mono text-sm font-bold">{utrn}</p>
+            <div className="mt-1">
+              <Barcode value={utrn} />
+            </div>
           </div>
         </div>
 
@@ -172,7 +183,7 @@ export default function ReceiptPage() {
             <Row label="Name of Claimant / Payee" value={record.name} />
             <Row label="Bank" value={formData.bankName || "—"} />
             <Row label="Account Number" value={formData.bankAccountNumber || "—"} />
-            <Row label="Indian Financial System Code (IFSC)" value={formData.bankIfsc || "—"} />
+            <Row label="Indian Financial System Code" value={formData.bankIfsc || "—"} />
             <Row label="Payment Type" value={record.category} />
             <Row label="Bank Reference No." value={record.bankReferenceNo || "—"} />
             <Row label="Component" value={record.services} />
@@ -180,7 +191,7 @@ export default function ReceiptPage() {
         </table>
 
         {/* Settlement */}
-        <div className="mb-2 font-bold text-sm">Settlement Details</div>
+        <div className="mb-2 font-bold text-sm">Details of Payment Settlement</div>
         <table className="w-full text-sm border-collapse border border-black mb-6">
           <tbody>
             <tr>
@@ -188,7 +199,7 @@ export default function ReceiptPage() {
               <td className="px-4 py-2 border border-black text-right">₹ {formatAmount(gross)}</td>
             </tr>
             <tr>
-              <td className="px-4 py-2 border border-black font-bold">Less: Tax Deducted at Source (TDS)</td>
+              <td className="px-4 py-2 border border-black font-bold">Less: Tax Deducted at Source</td>
               <td className="px-4 py-2 border border-black text-right">₹ {formatAmount(tds)}</td>
             </tr>
             <tr>
@@ -201,11 +212,11 @@ export default function ReceiptPage() {
         {/* Dates */}
         <div className="mb-6 p-4 border border-black text-sm">
           <p className="font-bold mb-2">Processing Dates:</p>
-          <ul className="list-disc pl-5">
-            <li><strong>Date of Entry:</strong> {formatDate(record.createdAt)}</li>
-            <li><strong>Date of Upload:</strong> {formatDate(record.updatedAt)}</li>
-            <li><strong>Date of Forwarding:</strong> {formatDate(record.adminApprovedAt)}</li>
-            <li><strong>Date of Approval:</strong> {formatDate(record.registrarApprovedAt)}</li>
+          <ul className="list-style-none space-y-1 pl-0">
+            <li><strong>Date of Entry:</strong> {formatDate(record.dateOfEntry || record.createdAt)}</li>
+            <li><strong>Date of Upload:</strong> {formatDate(record.dateOfUpload || record.updatedAt || record.createdAt)}</li>
+            <li><strong>Date of Forwarding:</strong> {formatDate(record.dateOfForwarding || record.adminApprovedAt)}</li>
+            <li><strong>Date of Approval:</strong> {formatDate(record.dateOfApproval || record.registrarApprovedAt)}</li>
           </ul>
         </div>
 
@@ -215,11 +226,11 @@ export default function ReceiptPage() {
             {record.category} Receipt electronically transmitted on{" "}
             <strong>{formatDate(submittedAt)}</strong> at{" "}
             <strong>{formatTime(submittedAt)}</strong> for an amount of{" "}
-            <strong>₹ {formatAmount(net)}/-</strong> from IP address{" "}
-            <strong>{record.submittedIp?.split(",")[0]?.trim() || "0.0.0.0"}</strong> and verified by{" "}
+            <strong>₹ {formatAmount(net)}/-</strong> from Internet Protocol address{" "}
+            <strong>{formatIP(record.submittedIp)}</strong> and verified by{" "}
             <strong>{record.name}</strong> having{" "}
-            <strong>Permanent Account Number (PAN) ({formData.pan || "—"})</strong> using Electronic Verification Code{" "}
-            <strong>{utrn}</strong> generated through Email / Mobile OTP mode.
+            <strong>Permanent Account Number ({formData.pan || "—"})</strong> using Electronic Verification Code{" "}
+            <strong>{utrn}</strong> generated through Email / Mobile One-Time Password mode.
           </p>
         </div>
 

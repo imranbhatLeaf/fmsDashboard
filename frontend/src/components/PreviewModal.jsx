@@ -27,12 +27,18 @@ export default function PreviewModal({ record, onClose }) {
         <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-white sticky top-0">
           <h2 className="text-lg font-bold">Transaction Preview</h2>
           <div className="flex items-center gap-2">
-            {/* Req 20: Print button for Admin and Registrar */}
+            {/* Req 20: Print official receipt */}
             <button
-              onClick={() => window.print()}
+              onClick={() => {
+                if (!record.bankReferenceNo || !record.dateOfTransfer) {
+                  alert("Receipt cannot be generated or printed without Bank Reference Number and Date of Transfer.");
+                  return;
+                }
+                window.open(`/receipt/${record.token}`, '_blank');
+              }}
               className="text-[10px] font-bold uppercase tracking-wider text-white bg-black hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors shadow-sm print:hidden"
             >
-              Print
+              Print Receipt
             </button>
             <button onClick={onClose} className="text-gray-500 hover:text-black print:hidden">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
