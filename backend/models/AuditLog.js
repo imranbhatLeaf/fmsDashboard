@@ -2,11 +2,11 @@ const mongoose = require("mongoose");
 
 const auditLogSchema = new mongoose.Schema(
   {
-    action: { type: String, required: true }, // "READ_PII" | "WRITE_PII"
-    recordId: { type: mongoose.Schema.Types.ObjectId, ref: "Record", required: true },
-    fieldsAccessing: [{ type: String, required: true }], // "pan_number", "aadhaar_number"
-    accessedBy: { type: String, default: "payee" },
-    ipAddress: { type: String, default: null },
+    action: { type: String, required: true },
+    recordId: { type: mongoose.Schema.Types.ObjectId, ref: "Record" },
+    fieldsAccessing: [{ type: String }],
+    accessedBy: { type: String },
+    ipAddress: { type: String },
   },
   { timestamps: true }
 );

@@ -300,17 +300,12 @@ router.post("/", upload.single("file"), async (req, res) => {
     if (validDocs.length > 0) {
       const inserted = await Record.insertMany(validDocs, { ordered: false });
       insertedCount = inserted.length;
-      for (const doc of inserted) {
-        try {
-          await sendEmail(doc);
-          await Record.findByIdAndUpdate(doc._id, {
-            emailSent: true,
-            emailSentAt: new Date(),
-          });
-        } catch (err) {
-          await Record.findByIdAndUpdate(doc._id, { error: err.message });
-        }
-      }
+      // Send emails in background — don't block the response
+inserted.forEach((doc) => {
+  sendEmail(doc)
+    .then(() => Record.findByIdAndUpdate(doc._id, { emailSent: true, emailSentAt: new Date() }))
+    .catch((err) => Record.findByIdAndUpdate(doc._id, { error: err.message }));
+});
     }
   } catch (err) {
     return res.status(500).json({

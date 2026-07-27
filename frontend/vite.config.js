@@ -7,7 +7,10 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
-    allowedHosts: ['51.79.173.103', 'localhost'],
+    allowedHosts: ['51.79.173.103', 'localhost', 'finance.asssr.org'],
+    fs: {
+      allow: ['..'],
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:5001',
