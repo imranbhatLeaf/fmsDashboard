@@ -78,6 +78,15 @@ const recordSchema = new mongoose.Schema(
     bankReferenceNo: { type: String, default: null },
     dateOfTransfer: { type: Date, default: null },
 
+    // Payee submitted details (PII)
+    pan_number: { type: String, default: null },
+    aadhaar_number: { type: String, default: null },
+    beneficiary_name: { type: String, default: null },
+    account_number: { type: String, default: null },
+    bank_name: { type: String, default: null },
+    ifsc_code: { type: String, default: null },
+    bank_branch_address: { type: String, default: null },
+
     // Mandatory Explicit Date Fields (Req 11)
     dateOfEntry: { type: Date, default: Date.now },
     dateOfUpload: { type: Date, default: null },

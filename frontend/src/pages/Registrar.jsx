@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logomain.avif";
 import asssrLogo from "../assets/asssrFav.avif";
 import headerImg from "../assets/header.png";
 import RecordModal from "../components/RecordModal";
+import PreviewModal from "../components/PreviewModal";
 
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
 
@@ -31,7 +32,7 @@ export default function Registrar() {
     setLoading(true);
     setError(null);
     try {
-      const query = activeCategory === "all" ? "" : `?component=${encodeURIComponent(activeCategory)}`;
+      const query = activeCategory === "all" ? "?adminApproved=true" : `?adminApproved=true&component=${encodeURIComponent(activeCategory)}`;
       const res = await fetch(`${API_BASE}/api/records${query}`, {
         headers: { Authorization: `Bearer ${auth?.token}` }
       });
@@ -161,16 +162,16 @@ export default function Registrar() {
 
   const getRecordStatus = (r) => {
     if (r.paymentProcessed) return "Paid";
-    if (r.adminApproved) return "Approved";
-    if (r.registrarApproved) return "Needs Admin Approval";
-    if (r.formSubmitted) return "Needs Registrar Approval";
+    if (r.registrarApproved) return "Approved";
+    if (r.adminApproved) return "Needs Registrar Approval";
+    if (r.formSubmitted) return "Needs Admin Approval";
     return "Form Pending";
   };
 
   const getFieldValue = (r, key) => {
     switch (key) {
       case "name": return r.name || "";
-      case "services": return r.services || "";
+      case "services": return r.services || r.component || "";
       case "category": return r.category || "";
       case "amount": return Number(r.amount) || 0;
       case "amountAfterTds": return r.amountAfterTds ? Number(r.amountAfterTds) : Number(r.amount * 0.9) || 0;
@@ -185,14 +186,16 @@ export default function Registrar() {
     }
   };
 
-  const sortedRecords = [...records].sort((a, b) => {
-    if (!sortConfig.key) return 0;
-    const aVal = getFieldValue(a, sortConfig.key);
-    const bVal = getFieldValue(b, sortConfig.key);
-    if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
-    if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
-    return 0;
-  });
+  const sortedRecords = useMemo(() => {
+    return [...records].sort((a, b) => {
+      if (!sortConfig.key) return 0;
+      const aVal = getFieldValue(a, sortConfig.key);
+      const bVal = getFieldValue(b, sortConfig.key);
+      if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [records, sortConfig]);
 
   const renderSortableHeader = (label, key, isRight = false) => {
     const isSorted = sortConfig.key === key;
@@ -285,14 +288,14 @@ export default function Registrar() {
         </div>
 
         {/* Total amount card */}
-        <div className="rounded-xl px-6 py-5 mb-8 flex items-center justify-between" style={{ background: DB }}>
+        <div className="rounded-xl px-6 py-5 mb-8 flex items-center justify-between border" style={{ background: "#FAF9F6", borderColor: "#dde3ec" }}>
           <div>
-            <p className="text-[10px] uppercase tracking-widest text-white/50 mb-1">Total Amount</p>
-            <p className="font-serif text-3xl font-bold tabular-nums text-white">
+            <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1 font-bold">Total Amount</p>
+            <p className="font-serif text-3xl font-bold tabular-nums text-black">
               ₹{totalAmount.toLocaleString("en-IN")}
             </p>
           </div>
-          <div className="text-white/20">
+          <div className="text-gray-300">
             <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75" />
             </svg>
@@ -451,7 +454,7 @@ export default function Registrar() {
                             <span
                               className="inline-block text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
                               style={
-                                status === "Approved" || status === "Paid" || status === "Needs Admin Approval"
+                                status === "Approved" || status === "Paid"
                                   ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
                                   : status === "Needs Registrar Approval"
                                   ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
@@ -500,7 +503,7 @@ export default function Registrar() {
         )}
       </main>
       {previewRecord && (
-        <RecordModal record={previewRecord} onClose={() => setPreviewRecord(null)} />
+        <PreviewModal record={previewRecord} onClose={() => setPreviewRecord(null)} />
       )}
     </div>
   );

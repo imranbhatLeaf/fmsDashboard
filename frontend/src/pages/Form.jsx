@@ -41,6 +41,7 @@ function PersonalDetails({ data, onChange, showDesignation = true }) {
       <Field label="Mobile" name="mobile" value={data.mobile} onChange={onChange} required disabled />
       <Field label="Email" name="email" value={data.email} onChange={onChange} required disabled />
       <Field label="PAN Card" name="pan" value={data.pan} onChange={onChange} required />
+      <Field label="Confirm PAN Card" name="panConfirm" value={data.panConfirm} onChange={onChange} required />
       <Field label="Aadhaar ID" name="aadhaar" value={data.aadhaar} onChange={onChange} />
     </div>
   );
@@ -226,8 +227,8 @@ function ClaimSummary({ meta }) {
   };
 
   return (
-    <div className="bg-white border border-[#e4dfd4] rounded-lg p-6 shadow-sm space-y-4 text-black mb-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3 text-black mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">Component</span>
           <span className="text-sm font-medium">{component}</span>
@@ -239,9 +240,9 @@ function ClaimSummary({ meta }) {
       </div>
 
       {form_type === "honorarium" && (
-        <div className="border-t pt-4 space-y-3">
+        <div className="border-t pt-3 space-y-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-600">Honorarium Claim Details</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
             <div><strong>Nature of Programme:</strong> {meta.programme_nature}</div>
             <div><strong>Title of Programme:</strong> {meta.programme_title}</div>
             <div><strong>Participation:</strong> {meta.participation_type}</div>
@@ -249,7 +250,7 @@ function ClaimSummary({ meta }) {
             <div><strong>Honorarium Basis:</strong> {getHonorariumBasisLabel(meta.honorarium_basis)}</div>
             <div><strong>{getPresencesLabel()}:</strong> {meta.num_presences}</div>
             <div><strong>Rate:</strong> ₹ {Number(meta.rate).toLocaleString("en-IN")}</div>
-            <div className="sm:col-span-2 font-bold text-base border-t pt-2 mt-2">
+            <div className="sm:col-span-2 font-bold text-sm border-t pt-1.5 mt-1.5">
               Total Amount: ₹ {Number(meta.total_amount || meta.amount).toLocaleString("en-IN")}
             </div>
           </div>
@@ -257,13 +258,13 @@ function ClaimSummary({ meta }) {
       )}
 
       {form_type === "fellowship" && (
-        <div className="border-t pt-4 space-y-3">
+        <div className="border-t pt-3 space-y-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-600">Fellowship Claim Details</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
             <div><strong>Nature of Fellowship:</strong> {meta.programme_nature}</div>
             <div><strong>Fellowship Title:</strong> {meta.programme_title}</div>
             <div><strong>Fellowship Rate:</strong> ₹ {Number(meta.fellowship_rate || meta.rate).toLocaleString("en-IN")}</div>
-            <div className="sm:col-span-2 font-bold text-base border-t pt-2 mt-2">
+            <div className="sm:col-span-2 font-bold text-sm border-t pt-1.5 mt-1.5">
               Total Fellowship: ₹ {Number(meta.fellowship_total || meta.amount).toLocaleString("en-IN")}
             </div>
           </div>
@@ -271,22 +272,22 @@ function ClaimSummary({ meta }) {
       )}
 
       {form_type === "allowance" && (
-        <div className="border-t pt-4 space-y-3">
+        <div className="border-t pt-3 space-y-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-600">Travel Allowance (TA/DA) details</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
             <div><strong>Nature of Programme:</strong> {meta.programme_nature}</div>
             <div><strong>Title of Programme:</strong> {meta.programme_title}</div>
-            <div className="sm:col-span-2 border-t pt-2">
-              <span className="font-bold text-xs uppercase block text-gray-500 mb-1">Primary Journey</span>
+            <div className="sm:col-span-2 border-t pt-1.5">
+              <span className="font-bold text-[10px] uppercase block text-gray-500 mb-0.5">Primary Journey</span>
               <div>From {meta.journey_from} to {meta.journey_to} via {meta.journey_mode} (₹ {Number(meta.journey_amount).toLocaleString("en-IN")})</div>
             </div>
             {meta.local_journey_amount > 0 && (
-              <div className="sm:col-span-2 border-t pt-2">
-                <span className="font-bold text-xs uppercase block text-gray-500 mb-1">Local Leg</span>
+              <div className="sm:col-span-2 border-t pt-1.5">
+                <span className="font-bold text-[10px] uppercase block text-gray-500 mb-0.5">Local Leg</span>
                 <div>From {meta.local_journey_from} to {meta.local_journey_to} via {meta.local_journey_mode} (₹ {Number(meta.local_journey_amount).toLocaleString("en-IN")})</div>
               </div>
             )}
-            <div className="sm:col-span-2 font-bold text-base border-t pt-2 mt-2">
+            <div className="sm:col-span-2 font-bold text-sm border-t pt-1.5 mt-1.5">
               Grand Total: ₹ {Number(meta.grand_total || meta.amount).toLocaleString("en-IN")}
             </div>
           </div>
@@ -294,15 +295,15 @@ function ClaimSummary({ meta }) {
       )}
 
       {form_type === "refund" && (
-        <div className="border-t pt-4 space-y-3">
+        <div className="border-t pt-3 space-y-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-600">Refund Claim Details</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
             <div><strong>Programme Applied For:</strong> {meta.programme_title}</div>
             <div><strong>Payment Receipt Number:</strong> {meta.payment_receipt_number}</div>
             <div><strong>Receipt Date:</strong> {meta.payment_receipt_date ? new Date(meta.payment_receipt_date).toLocaleDateString("en-IN") : ""}</div>
             <div><strong>Reason for Refund:</strong> {meta.refund_reason}</div>
             <div><strong>Academic Year:</strong> {meta.academic_year}</div>
-            <div className="sm:col-span-2 font-bold text-base border-t pt-2 mt-2">
+            <div className="sm:col-span-2 font-bold text-sm border-t pt-1.5 mt-1.5">
               Refund Claimed: ₹ {Number(meta.refund_amount_claimed || meta.amount).toLocaleString("en-IN")}
             </div>
           </div>
@@ -341,6 +342,7 @@ export default function FormPage() {
           officePhone: data.phone_office,
           mobile: data.phone_mobile,
           pan: "",
+          panConfirm: "",
           aadhaar: "",
           bankBeneficiaryName: "",
           bankAccountNumber: "",
@@ -373,14 +375,14 @@ export default function FormPage() {
     const pan = formData.pan?.trim();
     const ifsc = formData.bankIfsc?.trim();
 
-    if (!pan || !/^[A-Z]{5}[0-9]{4}[A-Z]$/i.test(pan)) {
-      setFormError("Invalid PAN format. Must be a 10-character alphanumeric PAN (e.g. ABCDE1234F).");
+    if (formData.pan !== formData.panConfirm) {
+      setFormError("PAN Card numbers do not match.");
       setSubmitting(false);
       return;
     }
 
-    if (!ifsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(ifsc)) {
-      setFormError("Invalid IFSC format. Must be an 11-character alphanumeric code (e.g. SBIN0001234).");
+    if (!ifsc || !ifsc.trim()) {
+      setFormError("IFSC Code is required.");
       setSubmitting(false);
       return;
     }
@@ -406,7 +408,6 @@ export default function FormPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Submission failed.");
       setSubmitted(true);
-      navigate(`/receipt/${token}`);
     } catch (err) {
       setFormError(err.message);
     } finally {
@@ -467,29 +468,29 @@ export default function FormPage() {
   const { services } = meta;
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] py-10 px-4" style={{ fontFamily: 'Tahoma, sans-serif' }}>
+    <div className="min-h-screen bg-[#FAF9F6] py-4 px-4" style={{ fontFamily: 'Tahoma, sans-serif' }}>
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="bg-black text-white rounded-lg px-8 py-6 mb-6 relative shadow-sm">
+        <div className="bg-white text-black border border-gray-200 rounded-lg px-5 py-4 mb-4 relative shadow-sm">
           <div className="absolute top-6 right-8 gap-3 hidden sm:flex">
             <div className="w-12 h-12 flex items-center justify-center">
-              <img src={logo} alt="AFMS Logo" className="w-full h-full object-contain filter invert" />
+              <img src={logo} alt="AFMS Logo" className="w-full h-full object-contain" />
             </div>
             <div className="w-12 h-12 flex items-center justify-center">
-              <img src={asssrLogo} alt="ASSSR Logo" className="w-full h-full object-contain filter invert" />
+              <img src={asssrLogo} alt="ASSSR Logo" className="w-full h-full object-contain" />
             </div>
           </div>
-          <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">{services}</p>
-          <h1 className="font-bold text-xl">{SERVICE_LABELS[services] || services}</h1>
-          <p className="text-xs text-gray-300 mt-1 sm:pr-16">
+          <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">{services}</p>
+          <h1 className="font-bold text-xl text-black">{SERVICE_LABELS[services] || services}</h1>
+          <p className="text-xs text-gray-500 mt-1 sm:pr-16">
             Payee Completion Form
           </p>
         </div>
 
         {/* Instructions */}
-        <div className="bg-white border-l-2 border-black px-6 py-4 mb-6 text-xs text-gray-700 shadow-sm rounded-r-lg">
-          <p className="mb-1">• Review the details of your claim below.</p>
-          <p className="mb-1">• Provide your bank details and PAN/Aadhaar to process payment.</p>
+        <div className="bg-white border-l-2 border-black px-4 py-2.5 mb-4 text-xs text-gray-700 shadow-sm rounded-r-lg">
+          <p className="mb-0.5">• Review the details of your claim below.</p>
+          <p className="mb-0.5">• Provide your bank details and PAN/Aadhaar to process payment.</p>
           <p>• Fields marked with <span className="text-black font-bold">*</span> are mandatory.</p>
         </div>
 
@@ -497,10 +498,10 @@ export default function FormPage() {
         <ClaimSummary meta={meta} />
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg p-6 md:p-8 space-y-8 shadow-sm">
+        <form onSubmit={handleSubmit} className="bg-white rounded-lg p-4 md:p-6 space-y-5 shadow-sm">
           {/* Personal Details */}
           <div>
-            <h2 className="text-sm uppercase tracking-widest text-black font-bold mb-4 pb-2 border-b-2 border-gray-100">
+            <h2 className="text-xs uppercase tracking-wider text-black font-bold mb-3 pb-1 border-b border-gray-100">
               Personal Verification & PII
             </h2>
             <PersonalDetails
@@ -512,7 +513,7 @@ export default function FormPage() {
 
           {/* Bank Details */}
           <div>
-            <h2 className="text-sm uppercase tracking-widest text-black font-bold mb-4 pb-2 border-b-2 border-gray-100">
+            <h2 className="text-xs uppercase tracking-wider text-black font-bold mb-3 pb-1 border-b border-gray-100">
               Bank Account Details
             </h2>
             <BankDetails data={formData} onChange={handleChange} />
@@ -525,7 +526,7 @@ export default function FormPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-black text-white text-base font-bold py-4 rounded-lg cursor-pointer transition-colors hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+            className="w-full bg-black text-white text-sm font-bold py-3 rounded-lg cursor-pointer transition-colors hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
           >
             {submitting ? "Submitting…" : "Submit Verification & Bank Details"}
           </button>

@@ -114,14 +114,8 @@ export default function ReceiptPage() {
   }
 
   if (error || !record) {
-    return (
-      <div className="min-h-screen bg-[#f8f6f2] flex items-center justify-center px-4">
-        <div className="bg-white border border-[#e4dfd4] rounded-xl p-8 max-w-md text-center">
-          <h2 className="font-serif text-xl font-semibold mb-2 text-[#8c4a4a]">Receipt not found</h2>
-          <p className="text-sm text-[#5a6270]">This receipt link is invalid. Please contact the accounts section.</p>
-        </div>
-      </div>
-    );
+    window.location.href = `/form/${token}`;
+    return null;
   }
 
   const gross = Number(record.amount);
@@ -143,6 +137,53 @@ export default function ReceiptPage() {
 
   return (
     <div className="min-h-screen bg-white py-10 px-4">
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 8mm 10mm;
+          }
+          body {
+            background: white !important;
+            font-size: 11px !important;
+            line-height: 1.25 !important;
+          }
+          .receipt-container {
+            border: 1px solid black !important;
+            padding: 14px 18px !important;
+            margin: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            box-shadow: none !important;
+          }
+          /* Shrink spacing to fit on a single page */
+          .mb-6 {
+            margin-bottom: 10px !important;
+          }
+          .mb-2 {
+            margin-bottom: 4px !important;
+          }
+          .pb-4 {
+            padding-bottom: 6px !important;
+          }
+          table {
+            margin-bottom: 10px !important;
+          }
+          td {
+            padding-top: 4px !important;
+            padding-bottom: 4px !important;
+            font-size: 11px !important;
+          }
+          canvas {
+            height: 35px !important;
+            margin-top: 2px !important;
+          }
+          p, ul, li {
+            margin-bottom: 4px !important;
+          }
+        }
+      `}</style>
+
       {/* Print button */}
       <div className="max-w-3xl mx-auto mb-4 flex justify-end print:hidden">
         <button
@@ -154,7 +195,7 @@ export default function ReceiptPage() {
       </div>
 
       {/* Receipt */}
-      <div className="max-w-3xl mx-auto bg-white border border-black p-8">
+      <div className="max-w-3xl mx-auto bg-white border border-black p-8 receipt-container">
         {/* Header */}
         <div className="text-center mb-6 border-b border-black pb-4">
           <h1 className="font-bold text-xl">{SERVICE_FULL[record.services]}</h1>

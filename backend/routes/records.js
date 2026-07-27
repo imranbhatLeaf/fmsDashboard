@@ -5,19 +5,15 @@ const { requireAuth, requireRole } = require("../utils/auth");
 
 async function generateUtrn(component) {
   const comp = (component || "ASSSR").toUpperCase();
+  const shortPrefix = comp.substring(0, 3);
   const year = new Date().getFullYear();
-  const prefix = `${comp}${year}`;
+  const prefix = `${shortPrefix}${year}`;
   
   const count = await Record.countDocuments({
-    component: comp,
     createdAt: {
       $gte: new Date(year, 0, 1),
       $lt: new Date(year + 1, 0, 1)
-    },
-    $or: [
-      { utrRrnReferenceNumber: new RegExp(`^${prefix}`) },
-      { bankReferenceNo: new RegExp(`^${prefix}`) }
-    ]
+    }
   });
   
   const seq = String(count + 1).padStart(3, "0");
@@ -29,11 +25,46 @@ async function generateUtrn(component) {
 // GET /api/records?component=ASSSR -> filtered by component (Req 18 fix)
 router.get("/", requireAuth, async (req, res) => {
   try {
+    // Auto-fill unsubmitted records older than 45 days as N/A
+    const fortyFiveDaysAgo = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
+    await Record.updateMany(
+      {
+        formSubmitted: { $ne: true },
+        createdAt: { $lt: fortyFiveDaysAgo },
+        isDeleted: { $ne: true }
+      },
+      {
+        $set: {
+          pan_number: "N/A",
+          aadhaar_number: "N/A",
+          beneficiary_name: "N/A",
+          account_number: "N/A",
+          bank_name: "N/A",
+          ifsc_code: "N/A",
+          bank_branch_address: "N/A",
+          formSubmitted: true,
+          payee_status: "completed",
+          formData: {
+            pan: "N/A",
+            panConfirm: "N/A",
+            aadhaar: "N/A",
+            bankBeneficiaryName: "N/A",
+            bankAccountNumber: "N/A",
+            bankAccountNumberConfirm: "N/A",
+            bankName: "N/A",
+            bankIfsc: "N/A",
+            bankIfscConfirm: "N/A",
+            bankBranchAddress: "N/A"
+          }
+        }
+      }
+    );
+
     const { category, component, adminApproved } = req.query;
     const filter = { isDeleted: { $ne: true } };
     
     if (category) filter.category = category;
-    if (component) filter.component = component;
+    if (component) filter.services = component;
     if (adminApproved !== undefined) {
       filter.adminApproved = adminApproved === "true";
     }
@@ -279,8 +310,8 @@ router.put("/:id/approve", requireAuth, requireRole(["registrar"]), async (req, 
     const record = await Record.findById(req.params.id);
     if (!record) return res.status(404).json({ message: "Record not found" });
 
-    if (!record.formSubmitted) {
-      return res.status(400).json({ message: "Payee must submit details before Registrar approval." });
+    if (!record.adminApproved) {
+      return res.status(400).json({ message: "Record must be approved by the Admin first." });
     }
     
     record.registrarApproved = true;
@@ -300,8 +331,8 @@ router.put("/:id/admin-approve", requireAuth, requireRole(["admin"]), async (req
     const record = await Record.findById(req.params.id);
     if (!record) return res.status(404).json({ message: "Record not found" });
 
-    if (!record.registrarApproved) {
-      return res.status(400).json({ message: "Record must be approved by the Registrar first." });
+    if (!record.formSubmitted) {
+      return res.status(400).json({ message: "Payee must submit details before Admin approval." });
     }
     
     record.adminApproved = true;

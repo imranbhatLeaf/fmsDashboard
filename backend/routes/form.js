@@ -61,22 +61,55 @@ router.get("/receipt/:token", rateLimiter, async (req, res) => {
 router.get("/:token", rateLimiter, async (req, res) => {
   try {
     const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }] });
+    if (!record) return res.status(404).json({ message: "Invalid link." });
+
+    const isExpired = new Date() > new Date(record.expiresAt) || (Date.now() - new Date(record.createdAt).getTime() > 45 * 24 * 60 * 60 * 1000);
+    if (isExpired && !record.formSubmitted) {
+      record.pan_number = "N/A";
+      record.aadhaar_number = "N/A";
+      record.beneficiary_name = "N/A";
+      record.account_number = "N/A";
+      record.bank_name = "N/A";
+      record.ifsc_code = "N/A";
+      record.bank_branch_address = "N/A";
+      record.formSubmitted = true;
+      record.payee_status = "completed";
+      record.formData = {
+        pan: "N/A",
+        panConfirm: "N/A",
+        aadhaar: "N/A",
+        bankBeneficiaryName: "N/A",
+        bankAccountNumber: "N/A",
+        bankAccountNumberConfirm: "N/A",
+        bankName: "N/A",
+        bankIfsc: "N/A",
+        bankIfscConfirm: "N/A",
+        bankBranchAddress: "N/A"
+      };
+      await record.save();
+    }
     
     // Allow completed or submitted records to be fetched to show status
-    if (!record || record.payee_status === "expired" || new Date() > new Date(record.expiresAt)) {
+    if (record.payee_status === "expired") {
       return res.status(404).json({ message: "Invalid or expired link." });
     }
 
     let approvalStatus = "Pending Verification & Approval";
     if (record.paymentProcessed) {
       approvalStatus = "Payment Processed (Completed)";
-    } else if (record.adminApproved) {
+    } else if (record.registrarApproved) {
       approvalStatus = "Approved by Registrar, Pending Payment";
+    } else if (record.adminApproved) {
+      approvalStatus = "Approved by Admin, Pending Registrar Approval";
     }
 
     res.json({
       name: record.name,
       email: record.email,
+      designation: record.designation,
+      address: record.address,
+      phone_office: record.phoneOffice,
+      phone_mobile: record.phoneMobile,
       amount: record.amount,
       amountAfterTds: record.amountAfterTds,
       category: record.category,
@@ -85,26 +118,30 @@ router.get("/:token", rateLimiter, async (req, res) => {
       form_type: record.form_type,
       formSubmitted: record.formSubmitted || false,
       approvalStatus,
-      honorarium_basis: record.honorarium_basis,
-      num_presences: record.num_presences,
+      honorarium_basis: record.honorariumBasis,
+      num_presences: record.numPresences,
       rate: record.rate,
-      total_amount: record.total_amount,
-      journey_from: record.journey_from,
-      journey_to: record.journey_to,
-      journey_mode: record.journey_mode,
-      journey_amount: record.journey_amount,
-      local_journey_from: record.local_journey_from,
-      local_journey_to: record.local_journey_to,
-      local_journey_mode: record.local_journey_mode,
-      local_journey_amount: record.local_journey_amount,
-      grand_total: record.grand_total,
-      fellowship_rate: record.fellowship_rate,
-      fellowship_total: record.fellowship_total,
-      refund_amount_claimed: record.refund_amount_claimed,
-      payment_receipt_number: record.payment_receipt_number,
-      payment_receipt_date: record.payment_receipt_date,
-      refund_reason: record.refund_reason,
-      academic_year: record.academic_year
+      total_amount: record.amount,
+      journey_from: record.journeyFrom,
+      journey_to: record.journeyTo,
+      journey_mode: record.journeyMode,
+      journey_amount: record.journeyAmount,
+      local_journey_from: record.localJourneyFrom,
+      local_journey_to: record.localJourneyTo,
+      local_journey_mode: record.localJourneyMode,
+      local_journey_amount: record.localJourneyAmount,
+      grand_total: record.grandTotal,
+      fellowship_rate: record.fellowshipRate,
+      fellowship_total: record.fellowshipTotal,
+      refund_amount_claimed: record.refundAmountClaimed,
+      payment_receipt_number: record.paymentReceiptNumber,
+      payment_receipt_date: record.paymentReceiptDate,
+      refund_reason: record.refundReason,
+      academic_year: record.academicYear,
+      programme_nature: record.programmeNature,
+      programme_title: record.programmeTitle,
+      participation_type: record.participationType,
+      lecture_type: record.lectureType
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -124,13 +161,11 @@ router.post("/:token", rateLimiter, async (req, res) => {
     const { pan, aadhaar, bankBeneficiaryName, bankAccountNumber, bankName, bankIfsc, bankBranchAddress } = req.body;
 
     // Validate only editable fields are provided/validated
-    if (!pan || !/^[A-Z]{5}[0-9]{4}[A-Z]$/i.test(pan.trim())) {
-      return res.status(400).json({ message: "Invalid PAN format. Must be a 10-character alphanumeric PAN (e.g. ABCDE1234F)." });
+    if (!pan || !pan.trim()) {
+      return res.status(400).json({ message: "PAN Card is required." });
     }
 
-    if (aadhaar && aadhaar.trim() && !/^\d{12}$/.test(aadhaar.trim())) {
-      return res.status(400).json({ message: "Invalid Aadhaar format. Must be a 12-digit numeric code if provided." });
-    }
+    // Aadhaar is optional; no pattern validation is enforced if provided
 
     if (!bankBeneficiaryName || !bankBeneficiaryName.trim()) {
       return res.status(400).json({ message: "Beneficiary name is required." });
@@ -144,8 +179,8 @@ router.post("/:token", rateLimiter, async (req, res) => {
       return res.status(400).json({ message: "Bank name is required." });
     }
 
-    if (!bankIfsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(bankIfsc.trim())) {
-      return res.status(400).json({ message: "Invalid IFSC format. Must be an 11-character alphanumeric code (e.g. SBIN0001234)." });
+    if (!bankIfsc || !bankIfsc.trim()) {
+      return res.status(400).json({ message: "IFSC code is required." });
     }
 
     if (!bankBranchAddress || !bankBranchAddress.trim()) {

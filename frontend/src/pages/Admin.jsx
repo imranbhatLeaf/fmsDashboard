@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logomain.avif";
 import asssrLogo from "../assets/asssrFav.avif";
 import headerImg from "../assets/header.png";
 import RecordModal from "../components/RecordModal";
+import PreviewModal from "../components/PreviewModal";
 
 // Point this at your Express backend. In Vite, set VITE_API_BASE in your .env file.
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
@@ -248,16 +249,16 @@ export default function AdminDashboard() {
 
   const getRecordStatus = (r) => {
     if (r.paymentProcessed) return "Paid";
-    if (r.adminApproved) return "Ready for Payment";
-    if (r.registrarApproved) return "Needs Admin Approval";
-    if (r.formSubmitted) return "Needs Registrar Approval";
+    if (r.registrarApproved) return "Ready for Payment";
+    if (r.adminApproved) return "Needs Registrar Approval";
+    if (r.formSubmitted) return "Needs Admin Approval";
     return "Form Pending";
   };
 
   const getFieldValue = (r, key) => {
     switch (key) {
       case "name": return r.name || "";
-      case "services": return r.services || "";
+      case "services": return r.services || r.component || "";
       case "category": return r.category || "";
       case "amount": return Number(r.amount) || 0;
       case "amountAfterTds": return r.amountAfterTds ? Number(r.amountAfterTds) : Number(r.amount * 0.9) || 0;
@@ -272,14 +273,16 @@ export default function AdminDashboard() {
     }
   };
 
-  const sortedRecords = [...records].sort((a, b) => {
-    if (!sortConfig.key) return 0;
-    const aVal = getFieldValue(a, sortConfig.key);
-    const bVal = getFieldValue(b, sortConfig.key);
-    if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
-    if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
-    return 0;
-  });
+  const sortedRecords = useMemo(() => {
+    return [...records].sort((a, b) => {
+      if (!sortConfig.key) return 0;
+      const aVal = getFieldValue(a, sortConfig.key);
+      const bVal = getFieldValue(b, sortConfig.key);
+      if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [records, sortConfig]);
 
   const renderSortableHeader = (label, key, isRight = false) => {
     const isSorted = sortConfig.key === key;
@@ -552,6 +555,12 @@ export default function AdminDashboard() {
                           <td className="px-0.5 py-1">
                             <div className="flex items-center gap-0.5 flex-wrap">
                               <button
+                                onClick={() => setPreviewRecord(r)}
+                                className="text-[9px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-1 py-0.2 rounded transition-colors shadow-sm bg-white"
+                              >
+                                Preview
+                              </button>
+                              <button
                                 onClick={() => openRecordModal(r)}
                                 className="text-[9px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-1 py-0.2 rounded transition-colors shadow-sm bg-white"
                               >
@@ -609,6 +618,13 @@ export default function AdminDashboard() {
           defaultFormType={initialFormType}
           onClose={() => setShowRecordModal(false)}
           onSave={handleSaveRecord}
+        />
+      )}
+
+      {previewRecord && (
+        <PreviewModal
+          record={previewRecord}
+          onClose={() => setPreviewRecord(null)}
         />
       )}
 

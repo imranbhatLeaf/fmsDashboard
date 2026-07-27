@@ -71,8 +71,8 @@ export default function PreviewModal({ record, onClose }) {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-gray-500">Name</span><span className="font-medium">{record.name}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Email</span><span>{record.email}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Phone</span><span>{formData.mobile || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">PAN</span><span>{formData.pan || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Phone</span><span>{formData.mobile || record.phoneMobile || record.phone_mobile || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">PAN</span><span>{formData.pan || record.pan || record.pan_number || "—"}</span></div>
             </div>
           </div>
 
@@ -80,10 +80,10 @@ export default function PreviewModal({ record, onClose }) {
           <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
             <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">Bank Details</h3>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Bank</span><span className="font-medium">{formData.bankName || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Account No.</span><span className="font-mono">{formData.bankAccountNumber || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">IFSC</span><span className="font-mono">{formData.bankIfsc || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Beneficiary</span><span>{formData.bankBeneficiaryName || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Bank</span><span className="font-medium">{formData.bankName || record.bank_name || record.bankName || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Account No.</span><span className="font-mono">{formData.bankAccountNumber || record.account_number || record.bankAccountNumber || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">IFSC</span><span className="font-mono">{formData.bankIfsc || record.ifsc_code || record.bankIfsc || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Beneficiary</span><span>{formData.bankBeneficiaryName || record.beneficiary_name || record.bankBeneficiaryName || "—"}</span></div>
             </div>
           </div>
 

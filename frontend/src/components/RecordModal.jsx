@@ -301,6 +301,9 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
     const required = field.required;
 
     let val = formData[name] || "";
+    if (name === 'component' && !val) {
+      val = formData.services || "";
+    }
     if (type === 'date' && val && val.includes('T')) {
       val = val.split('T')[0];
     }
@@ -432,7 +435,7 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
               <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm grid grid-cols-2 gap-4">
                 <div>
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Component</span>
-                  <span className="text-sm font-semibold">{formData.component || "N/A"}</span>
+                  <span className="text-sm font-semibold">{formData.component || formData.services || "N/A"}</span>
                 </div>
                 <div>
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Category</span>
