@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Record = require("../models/Record");
 const { requireAuth, requireRole } = require("../utils/auth");
+const { sendEmail } = require("../utils/mailer");
 
 async function generateUtrn(component) {
   const comp = (component || "ASSSR").toUpperCase();
@@ -272,6 +273,12 @@ router.post("/", requireAuth, requireRole(["admin"]), async (req, res) => {
     }
 
     const record = await Record.create(data);
+
+    // Send email in background — don't block the response
+    sendEmail(record)
+      .then(() => Record.findByIdAndUpdate(record._id, { emailSent: true, emailSentAt: new Date() }))
+      .catch((err) => Record.findByIdAndUpdate(record._id, { error: err.message }));
+
     res.status(201).json(record);
   } catch (err) {
     res.status(500).json({ message: err.message });

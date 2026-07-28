@@ -1,4 +1,4 @@
-const https = require("https");
+const nodemailer = require("nodemailer");
 
 function getSubject(doc) {
   const subjects = {
@@ -38,14 +38,14 @@ function getBody(doc) {
 }
 
 async function sendEmail(doc) {
-  const fromEmail = process.env.RESEND_FROM || "onboarding@resend.dev";
+  const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || "onboarding@resend.dev";
   const from = `${doc.services} Finance <${fromEmail}>`;
   const subject = getSubject(doc);
   const text = getBody(doc);
 
-  if (!process.env.RESEND_API_KEY || process.env.RESEND_API_KEY === "test" || process.env.RESEND_API_KEY === "") {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.log("----------------------------------------");
-    console.log("[DEV MODE] Resend API Key is missing. Simulating Email Delivery.");
+    console.log("[DEV MODE] SMTP credentials are missing in .env. Simulating Email Delivery.");
     console.log(`From: ${from}`);
     console.log(`To: ${doc.email}`);
     console.log(`Subject: ${subject}`);
@@ -54,38 +54,24 @@ async function sendEmail(doc) {
     return Promise.resolve("Simulated email delivery successfully");
   }
 
-  const body = JSON.stringify({
-    from,
-    to: [doc.email],
-    subject,
-    text,
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: parseInt(process.env.SMTP_PORT) || 465,
+    secure: process.env.SMTP_SECURE === "false" ? false : true, // defaults to true (port 465)
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
   });
 
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: "api.resend.com",
-      path: "/emails",
-      method: "POST",
-      family: 4,
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`
-      },
-    }, (res) => {
-      let responseBody = "";
-      res.on("data", (chunk) => { responseBody += chunk; });
-      res.on("end", () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(responseBody);
-        } else {
-          reject(new Error(`Resend API error (${res.statusCode}): ${responseBody}`));
-        }
-      });
-    });
-    req.on("error", reject);
-    req.write(body);
-    req.end();
-  });
+  const mailOptions = {
+    from,
+    to: doc.email,
+    subject,
+    text,
+  };
+
+  return transporter.sendMail(mailOptions);
 }
 
 module.exports = { sendEmail };
