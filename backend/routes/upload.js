@@ -46,17 +46,6 @@ function validateRow(row, rowNum) {
     return { isValid: false, reason: `Invalid form_type: "${row.form_type}"` };
   }
 
-  // Template routing check (§5)
-  if (rawComponent === "VMI" && !["allowance", "honorarium"].includes(rawFormType)) {
-    return { isValid: false, reason: `Template not available for VMI + ${rawFormType}` };
-  }
-  if (rawComponent === "DHC" && rawFormType !== "honorarium") {
-    return { isValid: false, reason: `Template not available for DHC + ${rawFormType}` };
-  }
-  if (rawComponent === "JASSSR") {
-    return { isValid: false, reason: `Template not available for JASSSR + ${rawFormType}` };
-  }
-
   // Basic fields check
   if (!row.name?.trim()) return { isValid: false, reason: "Missing name" };
   if (!row.designation?.trim()) return { isValid: false, reason: "Missing designation" };

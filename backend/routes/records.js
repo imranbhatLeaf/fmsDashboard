@@ -300,9 +300,16 @@ router.post("/", requireAuth, requireRole(["admin"]), async (req, res) => {
     const record = await Record.create(data);
 
     // Send email in background — don't block the response
+    console.log(`[EMAIL] Triggering Stage 1 email for record: ${record._id}, payee: ${record.name}, to: ${record.email}`);
     sendEmail(record)
-      .then(() => Record.findByIdAndUpdate(record._id, { emailSent: true, emailSentAt: new Date() }))
-      .catch((err) => Record.findByIdAndUpdate(record._id, { error: err.message }));
+      .then((info) => {
+        console.log(`[EMAIL] ✓ Sent successfully to ${record.email}. MessageId: ${info?.messageId || "n/a"}`);
+        return Record.findByIdAndUpdate(record._id, { emailSent: true, emailSentAt: new Date() });
+      })
+      .catch((err) => {
+        console.error(`[EMAIL] ✗ Failed to send to ${record.email}. Error: ${err.message}`);
+        return Record.findByIdAndUpdate(record._id, { error: err.message });
+      });
 
     res.status(201).json(record);
   } catch (err) {

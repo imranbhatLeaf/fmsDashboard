@@ -49,7 +49,7 @@ router.get("/receipt/:token", rateLimiter, async (req, res) => {
     const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }] });
     if (!record) return res.status(404).json({ message: "Not found." });
 
-    const isExpired = new Date() > new Date(record.expiresAt) || (Date.now() - new Date(record.createdAt).getTime() > 45 * 24 * 60 * 60 * 1000);
+    const isExpired = (record.expiresAt && new Date() > new Date(record.expiresAt)) || (Date.now() - new Date(record.createdAt).getTime() > 45 * 24 * 60 * 60 * 1000);
     if (isExpired && !record.formSubmitted) {
       record.pan_number = "N/A";
       record.aadhaar_number = "N/A";
@@ -133,7 +133,7 @@ router.get("/:token", rateLimiter, async (req, res) => {
     const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }] });
     if (!record) return res.status(404).json({ message: "Invalid link." });
 
-    const isExpired = new Date() > new Date(record.expiresAt) || (Date.now() - new Date(record.createdAt).getTime() > 45 * 24 * 60 * 60 * 1000);
+    const isExpired = (record.expiresAt && new Date() > new Date(record.expiresAt)) || (Date.now() - new Date(record.createdAt).getTime() > 45 * 24 * 60 * 60 * 1000);
     if (isExpired && !record.formSubmitted) {
       record.pan_number = "N/A";
       record.aadhaar_number = "N/A";

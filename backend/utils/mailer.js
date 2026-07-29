@@ -146,7 +146,7 @@ function getHtmlBody(doc, subject, stage = 1) {
         You can track the status of your payment using the following link: ${underlinedLink}
       </p>
       <p style="font-size: 14px; line-height: 1.6; margin-bottom: 20px; color: #374151;">
-        Please note that the remittance process typically takes **45-60 working days** (excluding weekends and holidays).
+        Please note that the remittance process typically takes 45-60 working days (excluding weekends and holidays).
       </p>
     `;
   } else if (stage === 3) {
