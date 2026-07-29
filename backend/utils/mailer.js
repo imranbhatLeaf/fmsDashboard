@@ -262,54 +262,56 @@ function getHtmlBody(doc, subject, stage = 1) {
 }
 
 async function sendEmail(doc, stage = 1) {
-  const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || "onboarding@resend.dev";
+  const fromEmail = process.env.SMTP_FROM || "noreply@finance.asssr.org";
   const from = `${doc.services} Finance <${fromEmail}>`;
   const subject = getSubject(doc, stage);
   const htmlSubject = getHtmlSubject(doc, stage);
   const text = getBody(doc, stage);
   const html = getHtmlBody(doc, htmlSubject, stage);
 
-  const logoPath = path.join(__dirname, "../../frontend/src/assets/header.png");
-  const attachments = [];
-  if (fs.existsSync(logoPath)) {
-    attachments.push({
-      filename: "header.png",
-      path: logoPath,
-      cid: "headerlogo",
-    });
-  }
+  const apiKey = process.env.RESEND_API_KEY || process.env.SMTP_PASS;
 
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+  if (!apiKey) {
     console.log("----------------------------------------");
-    console.log(`[DEV MODE] SMTP credentials are missing in .env. Simulating Email Delivery for STAGE ${stage}.`);
-    console.log(`From: ${from}`);
-    console.log(`To: ${doc.email}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Body (HTML/Logo attached: ${attachments.length > 0}):\n${text}`);
+    console.log(`[DEV MODE] No API key found. Simulating Email for STAGE ${stage}.`);
+    console.log(`To: ${doc.email} | Subject: ${subject}`);
     console.log("----------------------------------------");
     return Promise.resolve("Simulated email delivery successfully");
   }
 
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: parseInt(process.env.SMTP_PORT) || 465,
-    secure: process.env.SMTP_SECURE === "false" ? false : true, // defaults to true (port 465)
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+  // Use Resend HTTP API (port 443 — works on all VPS without SMTP port restrictions)
+  const logoPath = path.join(__dirname, "../../frontend/src/assets/header.png");
+  let htmlWithInlineLogo = html;
+
+  // Embed logo as base64 data URI so it works without SMTP attachments
+  if (fs.existsSync(logoPath)) {
+    const logoBase64 = fs.readFileSync(logoPath).toString("base64");
+    const logoDataUri = `data:image/png;base64,${logoBase64}`;
+    htmlWithInlineLogo = html.replace("cid:headerlogo", logoDataUri);
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({
+      from,
+      to: [doc.email],
+      subject,
+      text,
+      html: htmlWithInlineLogo,
+    }),
   });
 
-  const mailOptions = {
-    from,
-    to: doc.email,
-    subject,
-    text,
-    html,
-    attachments,
-  };
+  const result = await response.json();
 
-  return transporter.sendMail(mailOptions);
+  if (!response.ok) {
+    throw new Error(result.message || `Resend API error: ${response.status}`);
+  }
+
+  return { messageId: result.id };
 }
 
 module.exports = { sendEmail };
