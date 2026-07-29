@@ -3,6 +3,23 @@ const router = express.Router();
 const Record = require("../models/Record");
 const AuditLog = require("../models/AuditLog");
 
+async function generateUtrn(component) {
+  const comp = (component || "ASSSR").toUpperCase();
+  const shortPrefix = comp.substring(0, 3);
+  const year = new Date().getFullYear();
+  const prefix = `${shortPrefix}${year}`;
+  
+  const count = await Record.countDocuments({
+    createdAt: {
+      $gte: new Date(year, 0, 1),
+      $lt: new Date(year + 1, 0, 1)
+    }
+  });
+  
+  const seq = String(count + 1).padStart(3, "0");
+  return `${prefix}${seq}`;
+}
+
 // In-memory rate limiting map
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -31,6 +48,59 @@ router.get("/receipt/:token", rateLimiter, async (req, res) => {
   try {
     const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }] });
     if (!record) return res.status(404).json({ message: "Not found." });
+
+    const isExpired = new Date() > new Date(record.expiresAt) || (Date.now() - new Date(record.createdAt).getTime() > 45 * 24 * 60 * 60 * 1000);
+    if (isExpired && !record.formSubmitted) {
+      record.pan_number = "N/A";
+      record.aadhaar_number = "N/A";
+      record.beneficiary_name = "N/A";
+      record.account_number = "N/A";
+      record.bank_name = "N/A";
+      record.ifsc_code = "N/A";
+      record.bank_branch_address = "N/A";
+      record.formSubmitted = true;
+      record.payee_status = "completed";
+
+      // Auto-approve and process
+      record.adminApproved = true;
+      record.adminApprovedAt = record.adminApprovedAt || new Date();
+      record.dateOfForwarding = record.dateOfForwarding || new Date();
+
+      record.registrarApproved = true;
+      record.registrarApprovedAt = record.registrarApprovedAt || new Date();
+      record.dateOfApproval = record.dateOfApproval || new Date();
+
+      record.paymentProcessed = true;
+      record.paymentProcessedAt = record.paymentProcessedAt || new Date();
+      record.dateOfTransfer = record.dateOfTransfer || new Date();
+
+      if (!record.bankReferenceNo) {
+        record.bankReferenceNo = record.utr_rrn_reference_number || record.utrRrnReferenceNumber || await generateUtrn(record.component || record.services || "ASSSR");
+      }
+
+      if (!record.receiptNumber) {
+        const prefix = { ASSSR: "A", VMI: "V", DHC: "D", JASSSR: "J" }[record.services] || "X";
+        const year = new Date().getFullYear();
+        const count = await Record.countDocuments({ paymentProcessed: true });
+        const seq = String(count + 1).padStart(4, "0");
+        record.receiptNumber = `${prefix}${year}${seq}`;
+      }
+
+      record.formData = {
+        pan: "N/A",
+        panConfirm: "N/A",
+        aadhaar: "N/A",
+        bankBeneficiaryName: "N/A",
+        bankAccountNumber: "N/A",
+        bankAccountNumberConfirm: "N/A",
+        bankName: "N/A",
+        bankIfsc: "N/A",
+        bankIfscConfirm: "N/A",
+        bankBranchAddress: "N/A"
+      };
+      await record.save();
+    }
+
     if (!record.formSubmitted) return res.status(403).json({ message: "Form not yet submitted." });
     if (!record.bankReferenceNo || !record.dateOfTransfer) {
       return res.status(403).json({ message: "Receipt cannot be generated without Bank Reference Number and Date of Transfer." });
@@ -74,6 +144,32 @@ router.get("/:token", rateLimiter, async (req, res) => {
       record.bank_branch_address = "N/A";
       record.formSubmitted = true;
       record.payee_status = "completed";
+
+      // Auto-approve and process
+      record.adminApproved = true;
+      record.adminApprovedAt = record.adminApprovedAt || new Date();
+      record.dateOfForwarding = record.dateOfForwarding || new Date();
+
+      record.registrarApproved = true;
+      record.registrarApprovedAt = record.registrarApprovedAt || new Date();
+      record.dateOfApproval = record.dateOfApproval || new Date();
+
+      record.paymentProcessed = true;
+      record.paymentProcessedAt = record.paymentProcessedAt || new Date();
+      record.dateOfTransfer = record.dateOfTransfer || new Date();
+
+      if (!record.bankReferenceNo) {
+        record.bankReferenceNo = record.utr_rrn_reference_number || record.utrRrnReferenceNumber || await generateUtrn(record.component || record.services || "ASSSR");
+      }
+
+      if (!record.receiptNumber) {
+        const prefix = { ASSSR: "A", VMI: "V", DHC: "D", JASSSR: "J" }[record.services] || "X";
+        const year = new Date().getFullYear();
+        const count = await Record.countDocuments({ paymentProcessed: true });
+        const seq = String(count + 1).padStart(4, "0");
+        record.receiptNumber = `${prefix}${year}${seq}`;
+      }
+
       record.formData = {
         pan: "N/A",
         panConfirm: "N/A",
@@ -221,6 +317,12 @@ router.post("/:token", rateLimiter, async (req, res) => {
       fieldsAccessing: ["pan_number", "aadhaar_number"],
       accessedBy: "payee",
       ipAddress: record.submittedIp
+    });
+
+    // Send Stage 2 email (UTRN Issued) in background
+    const { sendEmail } = require("../utils/mailer");
+    sendEmail(record, 2).catch((err) => {
+      console.error("Error sending stage 2 email:", err);
     });
 
     res.json({ message: "Form submitted successfully." });

@@ -26,40 +26,65 @@ async function generateUtrn(component) {
 // GET /api/records?component=ASSSR -> filtered by component (Req 18 fix)
 router.get("/", requireAuth, async (req, res) => {
   try {
-    // Auto-fill unsubmitted records older than 45 days as N/A
+    // Auto-fill unsubmitted records older than 45 days as N/A and approve/process them automatically
     const fortyFiveDaysAgo = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
-    await Record.updateMany(
-      {
-        formSubmitted: { $ne: true },
-        createdAt: { $lt: fortyFiveDaysAgo },
-        isDeleted: { $ne: true }
-      },
-      {
-        $set: {
-          pan_number: "N/A",
-          aadhaar_number: "N/A",
-          beneficiary_name: "N/A",
-          account_number: "N/A",
-          bank_name: "N/A",
-          ifsc_code: "N/A",
-          bank_branch_address: "N/A",
-          formSubmitted: true,
-          payee_status: "completed",
-          formData: {
-            pan: "N/A",
-            panConfirm: "N/A",
-            aadhaar: "N/A",
-            bankBeneficiaryName: "N/A",
-            bankAccountNumber: "N/A",
-            bankAccountNumberConfirm: "N/A",
-            bankName: "N/A",
-            bankIfsc: "N/A",
-            bankIfscConfirm: "N/A",
-            bankBranchAddress: "N/A"
-          }
-        }
+    const expiredRecords = await Record.find({
+      formSubmitted: { $ne: true },
+      createdAt: { $lt: fortyFiveDaysAgo },
+      isDeleted: { $ne: true }
+    });
+
+    for (const record of expiredRecords) {
+      record.pan_number = "N/A";
+      record.aadhaar_number = "N/A";
+      record.beneficiary_name = "N/A";
+      record.account_number = "N/A";
+      record.bank_name = "N/A";
+      record.ifsc_code = "N/A";
+      record.bank_branch_address = "N/A";
+      record.formSubmitted = true;
+      record.payee_status = "completed";
+
+      // Auto-approve and process
+      record.adminApproved = true;
+      record.adminApprovedAt = record.adminApprovedAt || new Date();
+      record.dateOfForwarding = record.dateOfForwarding || new Date();
+
+      record.registrarApproved = true;
+      record.registrarApprovedAt = record.registrarApprovedAt || new Date();
+      record.dateOfApproval = record.dateOfApproval || new Date();
+
+      record.paymentProcessed = true;
+      record.paymentProcessedAt = record.paymentProcessedAt || new Date();
+      record.dateOfTransfer = record.dateOfTransfer || new Date();
+
+      if (!record.bankReferenceNo) {
+        record.bankReferenceNo = record.utr_rrn_reference_number || record.utrRrnReferenceNumber || await generateUtrn(record.component || record.services || "ASSSR");
       }
-    );
+
+      if (!record.receiptNumber) {
+        const prefix = { ASSSR: "A", VMI: "V", DHC: "D", JASSSR: "J" }[record.services] || "X";
+        const year = new Date().getFullYear();
+        const count = await Record.countDocuments({ paymentProcessed: true });
+        const seq = String(count + 1).padStart(4, "0");
+        record.receiptNumber = `${prefix}${year}${seq}`;
+      }
+
+      record.formData = {
+        pan: "N/A",
+        panConfirm: "N/A",
+        aadhaar: "N/A",
+        bankBeneficiaryName: "N/A",
+        bankAccountNumber: "N/A",
+        bankAccountNumberConfirm: "N/A",
+        bankName: "N/A",
+        bankIfsc: "N/A",
+        bankIfscConfirm: "N/A",
+        bankBranchAddress: "N/A"
+      };
+
+      await record.save();
+    }
 
     const { category, component, adminApproved } = req.query;
     const filter = { isDeleted: { $ne: true } };
@@ -387,6 +412,11 @@ router.put("/:id/process", requireAuth, requireRole(["admin"]), async (req, res)
 
     await record.save();
     
+    // Send Stage 3 email (Payment Released) in background
+    sendEmail(record, 3).catch((err) => {
+      console.error("Error sending stage 3 email:", err);
+    });
+
     res.json(record);
   } catch (err) {
     res.status(500).json({ message: err.message });
