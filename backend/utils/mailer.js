@@ -1,6 +1,4 @@
 const nodemailer = require("nodemailer");
-const path = require("path");
-const fs = require("fs");
 
 function getSubject(doc, stage = 1) {
   const paymentType = doc.category;
@@ -220,7 +218,7 @@ function getHtmlBody(doc, subject, stage = 1) {
 <body style="font-family: Tahoma, Arial, sans-serif; background-color: #FAF9F6; margin: 0; padding: 20px; color: #333333;">
   <div style="max-width: 650px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
     <div style="background-color: #ffffff; padding: 20px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-      <img src="cid:headerlogo" alt="Asiatic Society for Social Science Research Logo" style="max-height: 80px; max-width: 100%; height: auto;" />
+      <img src="https://finance.asssr.org/header.png" alt="Asiatic Society for Social Science Research Logo" style="max-height: 80px; max-width: 100%; height: auto;" />
     </div>
     <div style="padding: 15px 24px 0 24px; font-size: 11px; color: #b91c1c; font-family: monospace;">
       [Please do not reply to this mail as this is an automated mail service.]
@@ -280,16 +278,7 @@ async function sendEmail(doc, stage = 1) {
   }
 
   // Use Resend HTTP API (port 443 — works on all VPS without SMTP port restrictions)
-  const logoPath = path.join(__dirname, "../../frontend/src/assets/header.png");
-  let htmlWithInlineLogo = html;
-
-  // Embed logo as base64 data URI so it works without SMTP attachments
-  if (fs.existsSync(logoPath)) {
-    const logoBase64 = fs.readFileSync(logoPath).toString("base64");
-    const logoDataUri = `data:image/png;base64,${logoBase64}`;
-    htmlWithInlineLogo = html.replace("cid:headerlogo", logoDataUri);
-  }
-
+  // Logo is served from a hosted URL to avoid base64 bloat that causes Gmail clipping (102KB limit)
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -301,7 +290,7 @@ async function sendEmail(doc, stage = 1) {
       to: [doc.email],
       subject,
       text,
-      html: htmlWithInlineLogo,
+      html,
     }),
   });
 
