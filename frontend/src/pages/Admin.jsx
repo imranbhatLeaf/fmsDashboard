@@ -103,6 +103,33 @@ export default function AdminDashboard() {
   const [processSubmitting, setProcessSubmitting] = useState(false);
   const [processError, setProcessError] = useState("");
 
+  // Admin approve confirmation modal state
+  const [adminApproveModal, setAdminApproveModal] = useState(null); // null | { id, name }
+  const [adminApproveSubmitting, setAdminApproveSubmitting] = useState(false);
+
+  function openAdminApproveModal(record) {
+    setAdminApproveModal({ id: record._id, name: record.name });
+    setAdminApproveSubmitting(false);
+  }
+
+  async function submitAdminApprove() {
+    setAdminApproveSubmitting(true);
+    const id = adminApproveModal.id;
+    try {
+      const res = await fetch(`${API_BASE}/api/records/${id}/admin-approve`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${auth?.token}` }
+      });
+      if (!res.ok) throw new Error("Approval failed");
+      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, adminApproved: true, adminApprovedAt: new Date(), dateOfForwarding: new Date(), rejected: false } : r));
+      setAdminApproveModal(null);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setAdminApproveSubmitting(false);
+    }
+  }
+
   // Reject modal state
   const [rejectModal, setRejectModal] = useState(null); // null | { id }
   const [rejectReason, setRejectReason] = useState("");
@@ -640,7 +667,7 @@ export default function AdminDashboard() {
                               {status === "Pending Admin Approval" && (
                                 <>
                                   <button
-                                    onClick={() => handleAdminApprove(r._id)}
+                                    onClick={() => openAdminApproveModal(r)}
                                     className="text-[9px] font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 px-1 py-0.2 rounded transition-colors shadow-sm"
                                   >
                                     Approve
@@ -879,6 +906,57 @@ export default function AdminDashboard() {
                 className="text-sm font-bold text-white px-5 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700"
               >
                 {rejectSubmitting ? "Rejecting…" : "Confirm Rejection"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Admin Approve Confirmation Modal ── */}
+      {adminApproveModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.55)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setAdminApproveModal(null); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" style={{ border: "1px solid #e5e7eb" }}>
+            <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-start justify-between">
+              <div>
+                <h2 className="text-base font-bold text-black" style={{ fontFamily: "Tahoma, Geneva, sans-serif" }}>
+                  Confirm Approval
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">This will forward the record to the Registrar for final approval.</p>
+              </div>
+              <button
+                onClick={() => setAdminApproveModal(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none mt-0.5"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-gray-700">
+                Are you sure you want to approve the application for{" "}
+                <span className="font-bold text-black">{adminApproveModal.name}</span>?
+              </p>
+              <p className="text-xs text-gray-400 mt-2">This action will mark the record as Admin-approved and forward it to the Registrar.</p>
+            </div>
+            <div className="px-6 pb-6 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setAdminApproveModal(null)}
+                className="text-sm font-medium text-gray-600 px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                disabled={adminApproveSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitAdminApprove}
+                disabled={adminApproveSubmitting}
+                className="text-sm font-bold text-white px-5 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: "#2563eb" }}
+                onMouseEnter={(e) => { if (!adminApproveSubmitting) e.currentTarget.style.background = "#1d4ed8"; }}
+                onMouseLeave={(e) => { if (!adminApproveSubmitting) e.currentTarget.style.background = "#2563eb"; }}
+              >
+                {adminApproveSubmitting ? "Approving…" : "Confirm Approval"}
               </button>
             </div>
           </div>
