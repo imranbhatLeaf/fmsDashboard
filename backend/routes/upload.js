@@ -10,6 +10,23 @@ const { requireAuth, requireRole } = require("../utils/auth");
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+async function generateUtrn(component, offset = 0) {
+  const comp = (component || "ASSSR").toUpperCase();
+  const shortPrefix = comp.substring(0, 3);
+  const year = new Date().getFullYear();
+  const prefix = `${shortPrefix}${year}`;
+
+  const count = await Record.countDocuments({
+    createdAt: {
+      $gte: new Date(year, 0, 1),
+      $lt: new Date(year + 1, 0, 1)
+    }
+  });
+
+  const seq = String(count + offset + 1).padStart(3, "0");
+  return `${prefix}${seq}`;
+}
+
 // Flat 10% TDS deducted from every record. Change this single value if the rate changes.
 const TDS_RATE = 0.10;
 
@@ -223,8 +240,8 @@ router.post("/", requireAuth, requireRole(["admin"]), upload.single("file"), asy
             amountAfterTds = amount;
           }
 
-          // Cryptographically secure token
-          const payee_link_token = crypto.randomBytes(16).toString("hex");
+          // UTRN is used as the form URL token (assigned after parsing, see below)
+          const payee_link_token = null; // placeholder — filled in below
 
           validDocs.push({
             row_id: row.row_id.trim(),
@@ -290,6 +307,36 @@ router.post("/", requireAuth, requireRole(["admin"]), upload.single("file"), asy
   }
 
   let insertedCount = 0;
+  // Assign UTRNs sequentially to each valid doc after parsing is complete
+  // We get the current count once and offset per-doc to avoid duplicates in the batch
+  try {
+    const year = new Date().getFullYear();
+    const baseCount = await Record.countDocuments({
+      createdAt: { $gte: new Date(year, 0, 1), $lt: new Date(year + 1, 0, 1) }
+    });
+    for (let i = 0; i < validDocs.length; i++) {
+      const doc = validDocs[i];
+      const comp = (doc.component || "ASSSR").toUpperCase();
+      const shortPrefix = comp.substring(0, 3);
+      const seq = String(baseCount + i + 1).padStart(3, "0");
+      const utrn = `${shortPrefix}${year}${seq}`;
+      doc.payee_link_token = utrn;
+      doc.token = utrn;
+      doc.utr_rrn_reference_number = utrn;
+      doc.utrRrnReferenceNumber = utrn;
+    }
+  } catch (err) {
+    console.error("[UTRN] Failed to generate UTRNs for batch:", err.message);
+    // Fall back to random tokens if UTRN generation fails
+    for (const doc of validDocs) {
+      if (!doc.payee_link_token) {
+        const fallback = crypto.randomBytes(16).toString("hex");
+        doc.payee_link_token = fallback;
+        doc.token = fallback;
+      }
+    }
+  }
+
   try {
     if (validDocs.length > 0) {
       const inserted = await Record.insertMany(validDocs, { ordered: false });

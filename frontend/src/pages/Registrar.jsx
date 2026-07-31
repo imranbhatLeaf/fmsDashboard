@@ -123,16 +123,62 @@ export default function Registrar() {
     }
   }
 
-  async function handleApprove(id) {
+  // Approve modal state
+  const [approveModal, setApproveModal] = useState(null); // null | { id, name }
+  const [approveSubmitting, setApproveSubmitting] = useState(false);
+
+  function openApproveModal(record) {
+    setApproveModal({ id: record._id, name: record.name });
+    setApproveSubmitting(false);
+  }
+
+  async function submitApprove() {
+    setApproveSubmitting(true);
+    const id = approveModal.id;
     try {
       const res = await fetch(`${API_BASE}/api/records/${id}/approve`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${auth?.token}` }
       });
       if (!res.ok) throw new Error("Approval failed");
-      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, registrarApproved: true, dateOfApproval: new Date() } : r));
+      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, registrarApproved: true, dateOfApproval: new Date(), rejected: false } : r));
+      setApproveModal(null);
     } catch (err) {
       alert(err.message);
+    } finally {
+      setApproveSubmitting(false);
+    }
+  }
+
+  // Reject modal state
+  const [rejectModal, setRejectModal] = useState(null); // null | { id }
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
+
+  function openRejectModal(id) {
+    setRejectModal({ id });
+    setRejectReason("");
+    setRejectSubmitting(false);
+  }
+
+  async function submitReject() {
+    if (!rejectReason.trim()) return;
+    setRejectSubmitting(true);
+    const id = rejectModal.id;
+    try {
+      const res = await fetch(`${API_BASE}/api/records/${id}/reject`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth?.token}` },
+        body: JSON.stringify({ reason: rejectReason.trim() }),
+      });
+      if (!res.ok) throw new Error("Rejection failed");
+      const updated = await res.json();
+      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, ...updated } : r));
+      setRejectModal(null);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRejectSubmitting(false);
     }
   }
 
@@ -151,6 +197,7 @@ export default function Registrar() {
     }
   }
 
+
   // Excel sorting functions
   const handleSort = (key) => {
     let direction = "asc";
@@ -161,10 +208,11 @@ export default function Registrar() {
   };
 
   const getRecordStatus = (r) => {
+    if (r.rejected) return "Rejected";
     if (r.paymentProcessed) return "Paid";
     if (r.registrarApproved) return "Approved";
-    if (r.adminApproved) return "Needs Registrar Approval";
-    if (r.formSubmitted) return "Needs Admin Approval";
+    if (r.adminApproved) return "Pending Registrar Approval";
+    if (r.formSubmitted) return "Pending Admin Approval";
     return "Form Pending";
   };
 
@@ -181,7 +229,7 @@ export default function Registrar() {
       case "dateOfApproval": return r.dateOfApproval || r.registrarApprovedAt ? new Date(r.dateOfApproval || r.registrarApprovedAt).getTime() : 0;
       case "dateOfTransfer": return r.dateOfTransfer ? new Date(r.dateOfTransfer).getTime() : 0;
       case "status": return getRecordStatus(r);
-      case "utrn": return r.bankReferenceNo || r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "";
+      case "utrn": return r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "";
       default: return "";
     }
   };
@@ -449,14 +497,16 @@ export default function Registrar() {
                           <td className="px-2 py-1 border-r border-gray-300 text-right font-mono text-gray-700">
                             ₹{r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString("en-IN") : (r.category === "Refund" || r.category === "TA/DA" ? Number(r.amount).toLocaleString("en-IN") : Number(r.amount * 0.9).toLocaleString("en-IN"))}
                           </td>
-                          <td className="px-2 py-1 border-r border-gray-300 text-gray-500 font-mono text-xs">{r.bankReferenceNo || r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "—"}</td>
+                          <td className="px-2 py-1 border-r border-gray-300 text-gray-500 font-mono text-xs">{r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "—"}</td>
                           <td className="px-2 py-1 border-r border-gray-300">
                             <span
                               className="inline-block text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
                               style={
                                 status === "Approved" || status === "Paid"
                                   ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
-                                  : status === "Needs Registrar Approval"
+                                  : status === "Rejected"
+                                  ? { background: "#fef2f2", color: "#dc2626", borderColor: "#fca5a5" }
+                                  : status === "Pending Registrar Approval"
                                   ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
                                   : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
                               }
@@ -472,16 +522,37 @@ export default function Registrar() {
                               >
                                 Preview
                               </button>
-                              {status === "Needs Registrar Approval" && (
+                              {status === "Pending Registrar Approval" && (
+                                <>
+                                  <button
+                                    onClick={() => openApproveModal(r)}
+                                    className="text-[9px] font-bold uppercase tracking-wider text-white px-2 py-0.5 rounded transition-colors shadow-sm"
+                                    style={{ background: DB }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.background = "#333")}
+                                    onMouseLeave={(e) => (e.currentTarget.style.background = DB)}
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={() => openRejectModal(r._id)}
+                                    className="text-[9px] font-bold uppercase tracking-wider text-red-600 px-2 py-0.5 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
+                                  >
+                                    Reject
+                                  </button>
+                                </>
+                              )}
+                              {(status === "Form Pending" || status === "Pending Admin Approval" || status === "Approved") && (
                                 <button
-                                  onClick={() => handleApprove(r._id)}
-                                  className="text-[9px] font-bold uppercase tracking-wider text-white px-2 py-0.5 rounded transition-colors shadow-sm"
-                                  style={{ background: DB }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.background = "#333")}
-                                  onMouseLeave={(e) => (e.currentTarget.style.background = DB)}
+                                  onClick={() => openRejectModal(r._id)}
+                                  className="text-[9px] font-bold uppercase tracking-wider text-red-600 px-2 py-0.5 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
                                 >
-                                  Registrar Approve
+                                  Reject
                                 </button>
+                              )}
+                              {status === "Rejected" && r.rejectionReason && (
+                                <span className="text-[9px] italic text-red-500 max-w-[120px] truncate" title={r.rejectionReason}>
+                                  ↳ {r.rejectionReason}
+                                </span>
                               )}
                               {/* Req 16: Delete button — limited to Registrar only */}
                               <button
@@ -504,6 +575,117 @@ export default function Registrar() {
       </main>
       {previewRecord && (
         <PreviewModal record={previewRecord} onClose={() => setPreviewRecord(null)} />
+      )}
+
+      {/* ── Reject Modal ── */}
+      {rejectModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.55)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setRejectModal(null); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" style={{ border: "1px solid #e5e7eb" }}>
+            <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-start justify-between">
+              <div>
+                <h2 className="text-base font-bold text-red-600" style={{ fontFamily: "Tahoma, Geneva, sans-serif" }}>
+                  Reject Application
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">A rejection email with this reason will be sent to the payee.</p>
+              </div>
+              <button
+                onClick={() => setRejectModal(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none mt-0.5"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <label className="block text-xs font-bold text-gray-700 mb-1.5" htmlFor="regRejectReason">
+                Reason for Rejection <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="regRejectReason"
+                rows={4}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Enter the reason for rejection…"
+                className="w-full border rounded-lg px-3 py-2 text-sm outline-none transition-all resize-none"
+                style={{ borderColor: "#d1d5db" }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#000")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#d1d5db")}
+                autoFocus
+              />
+            </div>
+            <div className="px-6 pb-6 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setRejectModal(null)}
+                className="text-sm font-medium text-gray-600 px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                disabled={rejectSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitReject}
+                disabled={rejectSubmitting || !rejectReason.trim()}
+                className="text-sm font-bold text-white px-5 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700"
+              >
+                {rejectSubmitting ? "Rejecting…" : "Confirm Rejection"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Approve Confirmation Modal ── */}
+      {approveModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.55)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setApproveModal(null); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" style={{ border: "1px solid #e5e7eb" }}>
+            <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-start justify-between">
+              <div>
+                <h2 className="text-base font-bold text-black" style={{ fontFamily: "Tahoma, Geneva, sans-serif" }}>
+                  Confirm Approval
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">This will forward the record for payment processing.</p>
+              </div>
+              <button
+                onClick={() => setApproveModal(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none mt-0.5"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-gray-700">
+                Are you sure you want to approve the application for{" "}
+                <span className="font-bold text-black">{approveModal.name}</span>?
+              </p>
+              <p className="text-xs text-gray-400 mt-2">This action will mark the record as Registrar-approved and ready for payment.</p>
+            </div>
+            <div className="px-6 pb-6 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setApproveModal(null)}
+                className="text-sm font-medium text-gray-600 px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                disabled={approveSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitApprove}
+                disabled={approveSubmitting}
+                className="text-sm font-bold text-white px-5 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: "black" }}
+                onMouseEnter={(e) => { if (!approveSubmitting) e.currentTarget.style.background = "#333"; }}
+                onMouseLeave={(e) => { if (!approveSubmitting) e.currentTarget.style.background = "black"; }}
+              >
+                {approveSubmitting ? "Approving…" : "Confirm Approval"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

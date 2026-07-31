@@ -47,8 +47,12 @@ function PersonalDetails({ data, onChange, showDesignation = true }) {
   );
 }
 
+// Fields where copy/paste should be disabled (security-sensitive)
+const NO_COPY_PASTE_FIELDS = ["pan", "panConfirm", "bankAccountNumber", "bankAccountNumberConfirm", "bankIfsc", "bankIfscConfirm"];
+
 // Reusable field component
 function Field({ label, name, value, onChange, required, disabled, type = "text" }) {
+  const isSecure = NO_COPY_PASTE_FIELDS.includes(name);
   return (
     <div className="flex flex-col gap-1">
       <label className="text-xs font-bold text-gray-700">
@@ -61,6 +65,10 @@ function Field({ label, name, value, onChange, required, disabled, type = "text"
         onChange={onChange}
         disabled={disabled}
         required={required}
+        autoComplete="off"
+        onPaste={isSecure && !disabled ? (e) => e.preventDefault() : undefined}
+        onCopy={isSecure && !disabled ? (e) => e.preventDefault() : undefined}
+        onCut={isSecure && !disabled ? (e) => e.preventDefault() : undefined}
         className="border-b-2 border-gray-200 px-0 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black disabled:text-gray-400 transition-colors"
       />
     </div>
@@ -199,7 +207,16 @@ const SERVICE_LABELS = {
 // Claim Summary Component
 function ClaimSummary({ meta }) {
   const component = meta.component || meta.services;
-  const form_type = meta.form_type || (meta.category === "TA/DA" ? "allowance" : meta.category?.toLowerCase());
+  // Derive form_type robustly from both the explicit field and the category
+  const categoryToFormType = {
+    "TA/DA": "allowance",
+    "Fellowship": "fellowship",
+    "Honorarium": "honorarium",
+    "Refund": "refund",
+    "Salary": "honorarium",
+  };
+  const form_type = meta.form_type ||
+    (meta.category === "TA/DA" ? "allowance" : categoryToFormType[meta.category] || meta.category?.toLowerCase());
 
   // Pick the right label set for honorarium basis
   const getHonorariumBasisLabel = (basis) => {

@@ -258,6 +258,9 @@ router.post("/", requireAuth, requireRole(["admin"]), async (req, res) => {
     }
     data.utrRrnReferenceNumber = data.utr_rrn_reference_number;
     data.bankReferenceNo = data.utr_rrn_reference_number;
+    // Use UTRN as the form link token so URL becomes /form/<UTRN>
+    data.payee_link_token = data.utr_rrn_reference_number;
+    data.token = data.utr_rrn_reference_number;
     if (!data.payment_receipt_date) data.payment_receipt_date = new Date();
     if (!data.payment_dated) data.payment_dated = new Date();
     data.paymentDated = data.payment_dated;
@@ -266,8 +269,8 @@ router.post("/", requireAuth, requireRole(["admin"]), async (req, res) => {
     // Auto-generate required fields if missing or null/empty
     const requiredFallbacks = {
       row_id: () => `MANUAL_${Date.now()}`,
-      token: () => uuidv4(),
-      payee_link_token: () => require("crypto").randomBytes(32).toString("hex"),
+      token: () => data.utr_rrn_reference_number || require("uuid").v4(),
+      payee_link_token: () => data.utr_rrn_reference_number || require("crypto").randomBytes(32).toString("hex"),
       category: () => "Honorarium",
       form_type: () => "honorarium",
       services: () => "ASSSR",
@@ -377,6 +380,11 @@ router.put("/:id/admin-approve", requireAuth, requireRole(["admin"]), async (req
     record.adminApproved = true;
     record.adminApprovedAt = new Date();
     record.dateOfForwarding = new Date(); // Req 11
+    // Clear any previous rejection
+    record.rejected = false;
+    record.rejectedAt = null;
+    record.rejectionReason = null;
+    record.rejectedBy = null;
     await record.save();
     
     res.json(record);
@@ -385,23 +393,62 @@ router.put("/:id/admin-approve", requireAuth, requireRole(["admin"]), async (req
   }
 });
 
+// PUT /api/records/:id/reject -> Reject an application (Admin or Registrar)
+router.put("/:id/reject", requireAuth, requireRole(["admin", "registrar"]), async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const record = await Record.findById(req.params.id);
+    if (!record) return res.status(404).json({ message: "Record not found" });
+
+    const role = req.user?.role || "unknown";
+
+    record.rejected = true;
+    record.rejectedAt = new Date();
+    record.rejectionReason = reason || "No reason provided";
+    record.rejectedBy = role;
+
+    // Roll back the relevant approval so the record doesn't remain in a stale state
+    if (role === "registrar") {
+      // Registrar rejection: undo admin approval so it goes back to needs-admin-approval state
+      record.adminApproved = false;
+      record.adminApprovedAt = null;
+      record.dateOfForwarding = null;
+    } else if (role === "admin") {
+      // Admin rejection: reset form submission so payee can be notified
+      // (keeps the record visible but clearly rejected)
+    }
+
+    await record.save();
+
+    // Send rejection email to payee in background (Stage 4)
+    sendEmail(record, 4).catch((err) => {
+      console.error("[EMAIL] Failed to send rejection email:", err.message);
+    });
+
+    res.json(record);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // PUT /api/records/:id/process -> Process payment and generate receipt (Admin-only)
-// Requires bankReferenceNo and dateOfTransfer (Req 17)
+// bankReferenceNo is now a MANUAL field separate from UTRN — must be provided in request body
 router.put("/:id/process", requireAuth, requireRole(["admin"]), async (req, res) => {
   try {
-    let { bankReferenceNo, dateOfTransfer } = req.body;
+    const { bankReferenceNo, dateOfTransfer } = req.body;
+
+    if (!bankReferenceNo || !String(bankReferenceNo).trim()) {
+      return res.status(400).json({ message: "Bank Reference No is required." });
+    }
+    if (!dateOfTransfer) {
+      return res.status(400).json({ message: "Date of Transfer is required." });
+    }
 
     const record = await Record.findById(req.params.id);
     if (!record) return res.status(404).json({ message: "Record not found" });
 
-    if (!bankReferenceNo || !bankReferenceNo.trim()) {
-      bankReferenceNo = record.bankReferenceNo || record.utr_rrn_reference_number || record.utrRrnReferenceNumber || await generateUtrn(record.component || record.services || "ASSSR");
-    }
-    if (!dateOfTransfer) {
-      dateOfTransfer = new Date();
-    }
-
-    record.bankReferenceNo = bankReferenceNo.trim();
+    // bankReferenceNo is now a distinct manual field — UTRN (utr_rrn_reference_number) remains unchanged
+    record.bankReferenceNo = String(bankReferenceNo).trim();
     record.dateOfTransfer = new Date(dateOfTransfer);
     record.paymentProcessed = true;
     record.paymentProcessedAt = new Date();
@@ -410,15 +457,13 @@ router.put("/:id/process", requireAuth, requireRole(["admin"]), async (req, res)
     if (!record.receiptNumber) {
       const prefix = { ASSSR: "A", VMI: "V", DHC: "D", JASSSR: "J" }[record.services] || "X";
       const year = new Date().getFullYear();
-      const count = await Record.countDocuments({
-        paymentProcessed: true,
-      });
+      const count = await Record.countDocuments({ paymentProcessed: true });
       const seq = String(count + 1).padStart(4, "0");
       record.receiptNumber = `${prefix}${year}${seq}`;
     }
 
     await record.save();
-    
+
     // Send Stage 3 email (Payment Released) in background
     sendEmail(record, 3).catch((err) => {
       console.error("Error sending stage 3 email:", err);

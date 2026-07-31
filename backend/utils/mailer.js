@@ -73,16 +73,14 @@ Amount: ₹${amount}
 
 With this, the matter is settled and closed.`;
   } else if (stage === 4) {
-    content = `We regret to inform you that the bank details submitted for your ${paymentType} payment could not be processed due to a mismatch or verification failure.
+    const rejectionReason = doc.rejectionReason || "No reason provided";
+    content = `We regret to inform you that your ${paymentType} payment request has been rejected.
 
-You are requested to resubmit your correct bank details using the secure link below. This fresh verification link is valid for 7 days only.
+Reason for Rejection: ${rejectionReason}
 
-Link: ${formLink}
+If you believe this is an error or require further clarification, please contact the accounts section at finance@asssr.org.
 
-Important Points:
-- Please ensure the accuracy of the fresh bank details provided.
-- The fresh verification link is valid for 7 days only.
-- If the details are not resubmitted within this timeframe, the request will be closed and no further claims will be entertained.`;
+Note: Please do not use the previous submission link as it is no longer valid.`;
   }
 
   return `[Please do not reply to this mail as this is an automated mail service.]
@@ -187,24 +185,21 @@ function getHtmlBody(doc, subject, stage = 1) {
       </p>
     `;
   } else if (stage === 4) {
+    const rejectionReason = doc.rejectionReason || "No reason provided";
     mainContentHtml = `
       <p style="font-size: 14px; line-height: 1.6; margin-bottom: 20px; color: #374151;">
-        We regret to inform you that the bank details submitted for your ${paymentType} payment could not be processed due to a mismatch or verification failure.
+        We regret to inform you that your ${paymentType} payment request has been rejected.
       </p>
-      <p style="font-size: 14px; line-height: 1.6; margin-bottom: 20px; color: #374151;">
-        You are requested to resubmit your correct bank details using the secure link below. This fresh verification link is valid for <strong>7 days</strong> only.
-      </p>
-      <p style="font-size: 14px; line-height: 1.6; margin-bottom: 20px; color: #374151;">
-        Link: ${underlinedLink}
-      </p>
-      <div style="margin-top: 24px; margin-bottom: 24px;">
-        <h4 style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #111827;">Important Points:</h4>
-        <ul style="font-size: 13px; color: #4b5563; padding-left: 20px; line-height: 1.5; margin-top: 0;">
-          <li style="margin-bottom: 6px;">Please ensure the accuracy of the fresh bank details provided.</li>
-          <li style="margin-bottom: 6px;">The fresh verification link is valid for <strong>7 days</strong> only.</li>
-          <li style="margin-bottom: 6px;">If the details are not resubmitted within this timeframe, the request will be closed and no further claims will be entertained.</li>
-        </ul>
+      <div style="background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
+        <p style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; color: #dc2626; margin: 0 0 6px 0;">Reason for Rejection</p>
+        <p style="font-size: 14px; color: #7f1d1d; margin: 0; font-style: italic;">${rejectionReason}</p>
       </div>
+      <p style="font-size: 14px; line-height: 1.6; margin-bottom: 20px; color: #374151;">
+        If you believe this is an error or require further clarification, please contact the accounts section at <a href="mailto:finance@asssr.org" style="color: #1e40af;">finance@asssr.org</a>.
+      </p>
+      <p style="font-size: 13px; line-height: 1.6; color: #6b7280;">
+        Note: Please do not use the previous submission link as it is no longer valid.
+      </p>
     `;
   }
 

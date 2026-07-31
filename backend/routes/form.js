@@ -46,7 +46,7 @@ function rateLimiter(req, res, next) {
 // GET /api/form/receipt/:token — must be before /:token route
 router.get("/receipt/:token", rateLimiter, async (req, res) => {
   try {
-    const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }] });
+    const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }, { utr_rrn_reference_number: req.params.token }] });
     if (!record) return res.status(404).json({ message: "Not found." });
 
     const isExpired = (record.expiresAt && new Date() > new Date(record.expiresAt)) || (Date.now() - new Date(record.createdAt).getTime() > 45 * 24 * 60 * 60 * 1000);
@@ -130,7 +130,7 @@ router.get("/receipt/:token", rateLimiter, async (req, res) => {
 // GET /api/form/:token
 router.get("/:token", rateLimiter, async (req, res) => {
   try {
-    const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }] });
+    const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }, { utr_rrn_reference_number: req.params.token }] });
     if (!record) return res.status(404).json({ message: "Invalid link." });
 
     const isExpired = (record.expiresAt && new Date() > new Date(record.expiresAt)) || (Date.now() - new Date(record.createdAt).getTime() > 45 * 24 * 60 * 60 * 1000);
@@ -194,7 +194,7 @@ router.get("/:token", rateLimiter, async (req, res) => {
     if (record.paymentProcessed) {
       approvalStatus = "Payment Processed (Completed)";
     } else if (record.registrarApproved) {
-      approvalStatus = "Approved by Registrar, Pending Payment";
+      approvalStatus = "Approved by Registrar, Pending for Payment";
     } else if (record.adminApproved) {
       approvalStatus = "Approved by Admin, Pending Registrar Approval";
     }
@@ -247,7 +247,7 @@ router.get("/:token", rateLimiter, async (req, res) => {
 // POST /api/form/:token
 router.post("/:token", rateLimiter, async (req, res) => {
   try {
-    const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }] });
+    const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }, { utr_rrn_reference_number: req.params.token }] });
     
     // Hide details: same generic error if token doesn't exist, is completed, or is expired
     if (!record || record.payee_status === "completed" || record.payee_status === "expired" || record.formSubmitted || new Date() > new Date(record.expiresAt)) {

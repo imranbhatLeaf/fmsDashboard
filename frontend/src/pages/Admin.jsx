@@ -63,28 +63,84 @@ export default function AdminDashboard() {
         headers: { Authorization: `Bearer ${auth?.token}` }
       });
       if (!res.ok) throw new Error("Approval failed");
-      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, adminApproved: true, adminApprovedAt: new Date(), dateOfForwarding: new Date() } : r));
+      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, adminApproved: true, adminApprovedAt: new Date(), dateOfForwarding: new Date(), rejected: false } : r));
     } catch (err) {
       alert(err.message);
     }
   }
 
-  // Req 17: Process now requires bankReferenceNo and dateOfTransfer
-  // Req 17: Process now auto-generates bankReferenceNo (UTRN) and defaults dateOfTransfer
-  async function handleProcess(id) {
-    if (!window.confirm("Are you sure you want to process this payment? The bank reference number (UTRN) and transfer date will be auto-generated.")) return;
+  async function handleAdminReject(id) {
+    setRejectModal({ id });
+    setRejectReason("");
+    setRejectSubmitting(false);
+  }
+
+  async function submitReject() {
+    if (!rejectReason.trim()) return;
+    setRejectSubmitting(true);
+    const id = rejectModal.id;
     try {
-      const res = await fetch(`${API_BASE}/api/records/${id}/process`, {
+      const res = await fetch(`${API_BASE}/api/records/${id}/reject`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth?.token}` },
+        body: JSON.stringify({ reason: rejectReason.trim() }),
+      });
+      if (!res.ok) throw new Error("Rejection failed");
+      const updated = await res.json();
+      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, ...updated } : r));
+      setRejectModal(null);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRejectSubmitting(false);
+    }
+  }
+
+  // Process modal state
+  const [processModal, setProcessModal] = useState(null); // null | { id, utrn }
+  const [processBankRef, setProcessBankRef] = useState("");
+  const [processDate, setProcessDate] = useState("");
+  const [processSubmitting, setProcessSubmitting] = useState(false);
+  const [processError, setProcessError] = useState("");
+
+  // Reject modal state
+  const [rejectModal, setRejectModal] = useState(null); // null | { id }
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
+
+  function openProcessModal(record) {
+    const utrn = record.utr_rrn_reference_number || record.utrRrnReferenceNumber || record.bankReferenceNo || "—";
+    setProcessModal({ id: record._id, utrn });
+    setProcessBankRef("");
+    // Default date to today
+    setProcessDate(new Date().toISOString().slice(0, 10));
+    setProcessError("");
+    setProcessSubmitting(false);
+  }
+
+  async function handleProcessSubmit() {
+    if (!processBankRef.trim()) {
+      setProcessError("Bank Reference No is required.");
+      return;
+    }
+    if (!processDate) {
+      setProcessError("Date of Transfer is required.");
+      return;
+    }
+    setProcessSubmitting(true);
+    setProcessError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/records/${processModal.id}/process`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${auth?.token}`
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ bankReferenceNo: processBankRef.trim(), dateOfTransfer: processDate }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Processing failed");
-      setRecords((prev) => prev.map((r) => r._id === id ? {
+      setRecords((prev) => prev.map((r) => r._id === processModal.id ? {
         ...r,
         paymentProcessed: true,
         paymentProcessedAt: new Date(data.paymentProcessedAt || Date.now()),
@@ -92,9 +148,11 @@ export default function AdminDashboard() {
         bankReferenceNo: data.bankReferenceNo,
         receiptNumber: data.receiptNumber || r.receiptNumber,
       } : r));
-      alert("Payment processed successfully! UTRN generated: " + data.bankReferenceNo);
+      setProcessModal(null);
     } catch (err) {
-      alert(err.message);
+      setProcessError(err.message);
+    } finally {
+      setProcessSubmitting(false);
     }
   }
 
@@ -248,10 +306,11 @@ export default function AdminDashboard() {
   };
 
   const getRecordStatus = (r) => {
+    if (r.rejected) return "Rejected";
     if (r.paymentProcessed) return "Paid";
     if (r.registrarApproved) return "Ready for Payment";
-    if (r.adminApproved) return "Needs Registrar Approval";
-    if (r.formSubmitted) return "Needs Admin Approval";
+    if (r.adminApproved) return "Pending Registrar Approval";
+    if (r.formSubmitted) return "Pending Admin Approval";
     return "Form Pending";
   };
 
@@ -268,7 +327,7 @@ export default function AdminDashboard() {
       case "dateOfApproval": return r.dateOfApproval || r.registrarApprovedAt ? new Date(r.dateOfApproval || r.registrarApprovedAt).getTime() : 0;
       case "dateOfTransfer": return r.dateOfTransfer ? new Date(r.dateOfTransfer).getTime() : 0;
       case "status": return getRecordStatus(r);
-      case "utrn": return r.bankReferenceNo || r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "";
+      case "utrn": return r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "";
       default: return "";
     }
   };
@@ -535,16 +594,18 @@ export default function AdminDashboard() {
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfForwarding || r.adminApprovedAt)}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfApproval || r.registrarApprovedAt)}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfTransfer)}</td>
-                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-500 font-mono text-[11px]">{r.bankReferenceNo || r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "—"}</td>
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-500 font-mono text-[11px]">{r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "—"}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300">
                             <span
                               className="inline-block text-[9px] font-bold uppercase tracking-wider px-1 py-0.2 rounded border"
                               style={
                                 status === "Paid"
                                   ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
-                                  : status === "Ready for Payment" || status === "Needs Admin Approval"
+                                  : status === "Rejected"
+                                  ? { background: "#fef2f2", color: "#dc2626", borderColor: "#fca5a5" }
+                                  : status === "Ready for Payment" || status === "Pending Admin Approval"
                                   ? { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
-                                  : status === "Needs Registrar Approval"
+                                  : status === "Pending Registrar Approval"
                                   ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
                                   : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
                               }
@@ -560,12 +621,14 @@ export default function AdminDashboard() {
                               >
                                 Preview
                               </button>
+                              {!r.paymentProcessed && !r.registrarApproved && (
                               <button
                                 onClick={() => openRecordModal(r)}
                                 className="text-[9px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-1 py-0.2 rounded transition-colors shadow-sm bg-white"
                               >
                                 Edit
                               </button>
+                              )}
                               {status === "Form Pending" && (
                                 <button
                                   onClick={() => copyLink(r.token)}
@@ -574,21 +637,50 @@ export default function AdminDashboard() {
                                   Link
                                 </button>
                               )}
-                              {status === "Needs Admin Approval" && (
+                              {status === "Pending Admin Approval" && (
+                                <>
+                                  <button
+                                    onClick={() => handleAdminApprove(r._id)}
+                                    className="text-[9px] font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 px-1 py-0.2 rounded transition-colors shadow-sm"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={() => handleAdminReject(r._id)}
+                                    className="text-[9px] font-bold uppercase tracking-wider text-red-600 px-1 py-0.2 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
+                                  >
+                                    Reject
+                                  </button>
+                                </>
+                              )}
+                              {status === "Rejected" && r.rejectionReason && (
+                                <span className="text-[9px] italic text-red-500 max-w-[100px] truncate" title={r.rejectionReason}>
+                                  ↳ {r.rejectionReason}
+                                </span>
+                              )}
+                              {status === "Pending Registrar Approval" && (
                                 <button
-                                  onClick={() => handleAdminApprove(r._id)}
-                                  className="text-[9px] font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 px-1 py-0.2 rounded transition-colors shadow-sm"
+                                  onClick={() => handleAdminReject(r._id)}
+                                  className="text-[9px] font-bold uppercase tracking-wider text-red-600 px-1 py-0.2 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
                                 >
-                                  Approve
+                                  Reject
                                 </button>
                               )}
                               {status === "Ready for Payment" && (
-                                <button
-                                  onClick={() => handleProcess(r._id)}
-                                  className="text-[9px] font-bold uppercase tracking-wider text-white bg-green-600 hover:bg-green-700 px-1 py-0.2 rounded transition-colors shadow-sm"
-                                >
-                                  Process
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => openProcessModal(r)}
+                                    className="text-[9px] font-bold uppercase tracking-wider text-white bg-green-600 hover:bg-green-700 px-1 py-0.2 rounded transition-colors shadow-sm"
+                                  >
+                                    Process
+                                  </button>
+                                  <button
+                                    onClick={() => handleAdminReject(r._id)}
+                                    className="text-[9px] font-bold uppercase tracking-wider text-red-600 px-1 py-0.2 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
+                                  >
+                                    Reject
+                                  </button>
+                                </>
                               )}
                               {status === "Paid" && (
                                 <button
@@ -628,10 +720,170 @@ export default function AdminDashboard() {
         />
       )}
 
+      {/* ── Process Payment Modal ── */}
+      {processModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.55)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setProcessModal(null); }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+            style={{ border: "1px solid #e5e7eb" }}
+          >
+            {/* Header */}
+            <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-start justify-between">
+              <div>
+                <h2 className="text-base font-bold text-black" style={{ fontFamily: "Tahoma, Geneva, sans-serif" }}>
+                  Process Payment
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">Enter the bank transfer details to complete processing.</p>
+              </div>
+              <button
+                onClick={() => setProcessModal(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none mt-0.5"
+              >
+                &times;
+              </button>
+            </div>
 
+            {/* UTRN info banner */}
+              <div className="mx-6 mt-4 px-4 py-3 rounded-lg flex items-center gap-3" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" className="text-gray-400 shrink-0">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">UTRN (Status Reference Only — not used as Bank Ref)</p>
+                <p className="text-xs font-mono font-semibold text-gray-700 mt-0.5">{processModal.utrn}</p>
+              </div>
+            </div>
 
+            {/* Form */}
+            <div className="px-6 py-5 flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5" htmlFor="processBankRef">
+                  Bank Reference No <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="processBankRef"
+                  type="text"
+                  value={processBankRef}
+                  onChange={(e) => { setProcessBankRef(e.target.value); setProcessError(""); }}
+                  placeholder="e.g. SBIN0000123456789"
+                  className="w-full border rounded-lg px-3 py-2 text-sm outline-none transition-all"
+                  style={{ borderColor: processBankRef.trim() === "" && processError ? "#ef4444" : "#d1d5db" }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = "#000")}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = processBankRef.trim() === "" && processError ? "#ef4444" : "#d1d5db")}
+                  autoFocus
+                />
+              </div>
 
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5" htmlFor="processDate">
+                  Date of Transfer <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="processDate"
+                  type="date"
+                  value={processDate}
+                  onChange={(e) => { setProcessDate(e.target.value); setProcessError(""); }}
+                  className="w-full border rounded-lg px-3 py-2 text-sm outline-none transition-all"
+                  style={{ borderColor: !processDate && processError ? "#ef4444" : "#d1d5db" }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = "#000")}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = !processDate && processError ? "#ef4444" : "#d1d5db")}
+                  max={new Date().toISOString().slice(0, 10)}
+                />
+              </div>
 
+              {processError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {processError}
+                </p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setProcessModal(null)}
+                className="text-sm font-medium text-gray-600 px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                disabled={processSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleProcessSubmit}
+                disabled={processSubmitting}
+                className="text-sm font-bold text-white px-5 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: "black" }}
+                onMouseEnter={(e) => { if (!processSubmitting) e.currentTarget.style.background = "#333"; }}
+                onMouseLeave={(e) => { if (!processSubmitting) e.currentTarget.style.background = "black"; }}
+              >
+                {processSubmitting ? "Processing…" : "Confirm & Process"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reject Modal ── */}
+      {rejectModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.55)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setRejectModal(null); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" style={{ border: "1px solid #e5e7eb" }}>
+            <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-start justify-between">
+              <div>
+                <h2 className="text-base font-bold text-red-600" style={{ fontFamily: "Tahoma, Geneva, sans-serif" }}>
+                  Reject Application
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">A rejection email with this reason will be sent to the payee.</p>
+              </div>
+              <button
+                onClick={() => setRejectModal(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none mt-0.5"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <label className="block text-xs font-bold text-gray-700 mb-1.5" htmlFor="rejectReason">
+                Reason for Rejection <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="rejectReason"
+                rows={4}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Enter the reason for rejection…"
+                className="w-full border rounded-lg px-3 py-2 text-sm outline-none transition-all resize-none"
+                style={{ borderColor: "#d1d5db" }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#000")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#d1d5db")}
+                autoFocus
+              />
+            </div>
+            <div className="px-6 pb-6 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setRejectModal(null)}
+                className="text-sm font-medium text-gray-600 px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                disabled={rejectSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitReject}
+                disabled={rejectSubmitting || !rejectReason.trim()}
+                className="text-sm font-bold text-white px-5 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700"
+              >
+                {rejectSubmitting ? "Rejecting…" : "Confirm Rejection"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+}

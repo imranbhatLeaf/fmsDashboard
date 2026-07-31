@@ -144,6 +144,12 @@ const recordSchema = new mongoose.Schema(
     honorariumAsPerNorms: { type: String, default: null },
     honorarium_as_per_norms: { type: String, default: null },
 
+    // Rejection tracking
+    rejected: { type: Boolean, default: false },
+    rejectedAt: { type: Date, default: null },
+    rejectionReason: { type: String, default: null },
+    rejectedBy: { type: String, default: null }, // "admin" or "registrar"
+
     // Soft-delete support (recycle bin)
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },
