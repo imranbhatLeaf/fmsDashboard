@@ -226,6 +226,52 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
     setError(null);
     try {
       let dataToSave = { ...formData };
+      const emailVal = formData.email || '';
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailVal && !emailRegex.test(emailVal)) {
+        setError('Please enter a valid email address.');
+        setSaving(false);
+        return;
+      }
+      const nameValInput = formData.name || '';
+      if (nameValInput && !/^[a-zA-Z\s]+$/.test(nameValInput)) {
+        setError('Name must contain only letters and spaces.');
+        setSaving(false);
+        return;
+      }
+      const addressVal = formData.address || '';
+      if (addressVal && !/[a-zA-Z]/.test(addressVal)) {
+        setError('Address must contain at least one letter.');
+        setSaving(false);
+        return;
+      }
+      if (addressVal && /[^a-zA-Z0-9\s,.\/\-]/.test(addressVal)) {
+        setError('Address must not contain special characters.');
+        setSaving(false);
+        return;
+      }
+      const natureVal = formData.nature_of_programme || formData.natureOfProgramme || '';
+      if (natureVal && !/^[a-zA-Z0-9\s]+$/.test(natureVal)) {
+        setError('Nature of Programme must not contain special characters.');
+        setSaving(false);
+        return;
+      }
+      if (natureVal && !/[a-zA-Z]/.test(natureVal)) {
+        setError('Nature of Programme must contain at least one letter.');
+        setSaving(false);
+        return;
+      }
+      const titleVal = formData.title_of_programme || formData.titleOfProgramme || '';
+      if (titleVal && !/^[a-zA-Z0-9\s]+$/.test(titleVal)) {
+        setError('Title of Programme must not contain special characters.');
+        setSaving(false);
+        return;
+      }
+      if (titleVal && !/[a-zA-Z]/.test(titleVal)) {
+        setError('Title of Programme must contain at least one letter.');
+        setSaving(false);
+        return;
+      }
 
       // ── Validation ──────────────────────────────────────────────
       // Name & Designation: letters, spaces, dots, hyphens only (no numbers or special chars)
@@ -285,6 +331,26 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
         dataToSave.academic_year = formData.academic_year;
         dataToSave.programme_title = formData.programme_applied_for || formData.programme_title;
       } else if (selectedFormType === 'fellowship') {
+        if (!formData.component && !formData.services) {
+          setError('Component is required. Please select a component.');
+          setSaving(false);
+          return;
+        }
+        if (!formData.nature_of_programme && !formData.natureOfProgramme) {
+          setError('Nature of Programme is required. Please enter the nature of programme.');
+          setSaving(false);
+          return;
+        }
+        if (!formData.title_of_programme && !formData.titleOfProgramme) {
+          setError('Title of Programme is required. Please enter the title of programme.');
+          setSaving(false);
+          return;
+        }
+        if (!formData.total || Number(formData.total) <= 0) {
+          setError('Fellowship Amount must be greater than 0.');
+          setSaving(false);
+          return;
+        }
         dataToSave.form_type = 'fellowship';
         dataToSave.category = 'Fellowship';
         // Auto-fill core fields for compatibility
@@ -312,6 +378,31 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
         dataToSave.amount = Number(formData.passed_for_payment_amount || dataToSave.grand_total);
         dataToSave.claimant_signature = formData.claimant_signature;
       } else if (selectedFormType === 'salary') {
+        if (!formData.component && !formData.services) {
+          setError('Component is required. Please select a component.');
+          setSaving(false);
+          return;
+        }
+        if (!formData.nature_of_programme && !formData.natureOfProgramme) {
+          setError('Nature of Programme is required. Please enter the nature of programme.');
+          setSaving(false);
+          return;
+        }
+        if (!formData.title_of_programme && !formData.titleOfProgramme) {
+          setError('Title of Programme is required. Please enter the title of programme.');
+          setSaving(false);
+          return;
+        }
+        if (!formData.amount && !formData.total) {
+          setError('Salary Amount is required. Please enter a valid salary amount.');
+          setSaving(false);
+          return;
+        }
+        if ((formData.amount && Number(formData.amount) <= 0) || (formData.total && Number(formData.total) <= 0)) {
+          setError('Salary Amount must be greater than 0.');
+          setSaving(false);
+          return;
+        }
         dataToSave.form_type = 'salary';
         dataToSave.category = 'Salary';
         dataToSave.name = formData.name;
@@ -411,7 +502,7 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
           {label} {required && <span className="text-red-500">*</span>}
         </label>
         <input
-          type={type === 'number' ? 'number' : type === 'date' ? 'date' : 'text'}
+          type={type === 'number' ? 'number' : type === 'date' ? 'date' : type === 'email' ? 'email' : 'text'}
           name={name}
           value={val}
           onChange={handleChange}
@@ -479,7 +570,6 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                   }}
                   className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black animate-fadeIn"
                 >
-                  <option value="standard">Standard Payment Form</option>
                   <option value="salary">Salary Form</option>
                   <option value="refund">Refund Form</option>
                   <option value="fellowship">Fellowship Bill Form</option>

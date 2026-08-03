@@ -340,7 +340,7 @@ export default function AdminDashboard() {
     if (r.paymentProcessed) return "Paid";
     if (r.registrarApproved) return "Approved by Registrar, Pending for Payment";
     if (r.adminApproved) return "Pending Registrar Approval";
-    if (r.formSubmitted) return "Pending Accounts (Admin) Approval";
+    if (r.formSubmitted) return "Approval Pending";
     return "Form Pending";
   };
 
@@ -474,13 +474,7 @@ export default function AdminDashboard() {
                 <p className="text-sm font-semibold mb-1">Add a Single Entry Manually</p>
                 <p className="text-xs text-gray-500 mb-3">Choose a form format to add the record details directly.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-                  <button
-                    onClick={() => openAddModal("standard")}
-                    className="flex items-center justify-center gap-2 text-sm font-bold py-3 px-4 rounded-lg transition-all border-2 border-dashed border-gray-300 hover:border-black hover:bg-gray-50 text-gray-700 hover:text-black"
-                  >
-                    <span>+</span> Standard Payment Form
-                  </button>
-                  <button
+<button
                     onClick={() => openAddModal("salary")}
                     className="flex items-center justify-center gap-2 text-sm font-bold py-3 px-4 rounded-lg transition-all border-2 border-dashed border-gray-300 hover:border-black hover:bg-gray-50 text-gray-700 hover:text-black"
                   >
@@ -637,7 +631,7 @@ export default function AdminDashboard() {
                                   ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
                                   : status === "Rejected"
                                   ? { background: "#fef2f2", color: "#dc2626", borderColor: "#fca5a5" }
-                                  : status === "Approved by Registrar, Pending for Payment" || status === "Pending Accounts (Admin) Approval"
+                                  : status === "Approved by Registrar, Pending for Payment" || status === "Approval Pending"
                                   ? { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
                                   : status === "Pending Registrar Approval"
                                   ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
@@ -657,7 +651,7 @@ export default function AdminDashboard() {
   {status === "Pending Registrar Approval" && (r.adminApprovedAt || r.dateOfForwarding) && (
     <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.adminApprovedAt || r.dateOfForwarding)}</div>
   )}
-  {status === "Pending Accounts (Admin) Approval" && r.dateOfUpload && (
+  {status === "Approval Pending" && r.dateOfUpload && (
     <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.dateOfUpload)}</div>
   )}
 </span>
@@ -679,7 +673,7 @@ export default function AdminDashboard() {
                                </button>
                                 )} 
                               
-                              {status === "Pending Accounts (Admin) Approval" && (
+                              {status === "Approval Pending" && (
                                 <>
                                   <button
                                     onClick={() => openAdminApproveModal(r)}
@@ -694,11 +688,6 @@ export default function AdminDashboard() {
                                     Reject
                                   </button>
                                 </>
-                              )}
-                              {status === "Rejected" && (
-                                <span className="text-[11px] font-semibold text-red-600 block mt-1">
-                                  (See Preview for rejection reason)
-                                </span>
                               )}
                               {status === "Pending Registrar Approval" && (
                                 <span className="text-[11px] text-gray-400 italic">Awaiting Registrar</span>
