@@ -7,7 +7,7 @@ export default function PreviewModal({ record, onClose }) {
   if (!record) return null;
 
   const gross = Number(record.amount);
-  const tdsAmt = record.amountAfterTds ? gross - Number(record.amountAfterTds) : (record.category === "Refund" || record.category === "TA/DA" ? 0 : gross * 0.1);
+  const tdsAmt = record.amountAfterTds ? gross - Number(record.amountAfterTds) : (record.category === "Refund" || record.category === "Fellowship" ? 0 : gross * 0.1);
   const net = record.amountAfterTds ? Number(record.amountAfterTds) : gross - tdsAmt;
   const utrn = record.receiptNumber || record.token?.split("-")[0].toUpperCase();
   const formData = record.formData || {};

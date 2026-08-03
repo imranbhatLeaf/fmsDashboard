@@ -222,7 +222,7 @@ export default function Registrar() {
       case "services": return r.services || r.component || "";
       case "category": return r.category || "";
       case "amount": return Number(r.amount) || 0;
-      case "amountAfterTds": return r.amountAfterTds ? Number(r.amountAfterTds) : ((r.category === "Refund" || r.category === "TA/DA" || r.category === "Fellowship") ? Number(r.amount) || 0 : Number(r.amount * 0.9) || 0);
+      case "amountAfterTds": return r.amountAfterTds ? Number(r.amountAfterTds) : ((r.category === "Refund" || r.category === "Fellowship") ? Number(r.amount) || 0 : Number(r.amount * 0.9) || 0);
       case "dateOfEntry": return new Date(r.dateOfEntry || r.createdAt).getTime();
       case "dateOfUpload": return r.dateOfUpload ? new Date(r.dateOfUpload).getTime() : 0;
       case "dateOfForwarding": return r.dateOfForwarding || r.adminApprovedAt ? new Date(r.dateOfForwarding || r.adminApprovedAt).getTime() : 0;
@@ -495,7 +495,7 @@ export default function Registrar() {
                             ₹{Number(r.amount).toLocaleString("en-IN")}
                           </td>
                           <td className="px-2 py-1 border-r border-gray-300 text-right font-mono text-gray-700">
-                            ₹{r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString("en-IN") : (r.category === "Refund" || r.category === "TA/DA" || r.category === "Fellowship" ? Number(r.amount).toLocaleString("en-IN") : Number(r.amount * 0.9).toLocaleString("en-IN"))}
+                            ₹{r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString("en-IN") : (r.category === "Refund" || r.category === "Fellowship" ? Number(r.amount).toLocaleString("en-IN") : Number(r.amount * 0.9).toLocaleString("en-IN"))}
                           </td>
                           <td className="px-2 py-1 border-r border-gray-300 text-gray-500 font-mono text-xs">{r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "—"}</td>
                           <td className="px-2 py-1 border-r border-gray-300">
