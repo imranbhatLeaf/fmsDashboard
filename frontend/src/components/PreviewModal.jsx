@@ -126,6 +126,46 @@ export default function PreviewModal({ record, onClose }) {
             </div>
           </div>
 
+          {/* Journey Details */}
+          {record.journeyRows && record.journeyRows.length > 0 && record.journeyRows[0].journey_from && (
+            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">Journey Details</h3>
+              <div className="space-y-3 text-sm">
+                {record.journeyRows.map((row, idx) => (
+                  <div key={idx} className="border-b border-gray-50 pb-2 last:border-0 last:pb-0">
+                    <div className="flex flex-col sm:flex-row sm:justify-between mb-1">
+                      <span className="font-medium text-gray-800">
+                        {row.journey_from} {row.journey_from_date ? `(${new Date(row.journey_from_date).toLocaleDateString()})` : ''} ➔ {row.journey_to} {row.journey_to_date ? `(${new Date(row.journey_to_date).toLocaleDateString()})` : ''}
+                      </span>
+                      <span className="font-mono text-gray-700">₹{row.journey_amount}</span>
+                    </div>
+                    <div className="text-xs text-gray-500">Mode: {row.journey_mode}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Local Journey Details */}
+          {record.localJourneyRows && record.localJourneyRows.length > 0 && record.localJourneyRows[0].local_journey_from && (
+            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">Local Journey Details</h3>
+              <div className="space-y-3 text-sm">
+                {record.localJourneyRows.map((row, idx) => (
+                  <div key={idx} className="border-b border-gray-50 pb-2 last:border-0 last:pb-0">
+                    <div className="flex flex-col sm:flex-row sm:justify-between mb-1">
+                      <span className="font-medium text-gray-800">
+                        {row.local_journey_date ? `${new Date(row.local_journey_date).toLocaleDateString()} : ` : ''}{row.local_journey_from} ➔ {row.local_journey_to}
+                      </span>
+                      <span className="font-mono text-gray-700">₹{row.local_journey_amount}</span>
+                    </div>
+                    <div className="text-xs text-gray-500">Mode: {row.local_journey_mode}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Rejection Reason (only shown if rejected) */}
           {record.rejected && record.rejectionReason && (
             <div className="bg-red-50 p-4 rounded-lg border border-red-200 shadow-sm">

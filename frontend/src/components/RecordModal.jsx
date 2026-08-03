@@ -183,8 +183,8 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
 
   useEffect(() => {
     if (selectedFormType === 'tada') {
-      setJourneyRows(formData.journeyRows && formData.journeyRows.length > 0 ? formData.journeyRows : [{ journey_from: '', journey_to: '', journey_mode: 'Road', journey_amount: '' }]);
-      setLocalJourneyRows(formData.localJourneyRows && formData.localJourneyRows.length > 0 ? formData.localJourneyRows : [{ local_journey_from: '', local_journey_to: '', local_journey_mode: 'Bus', local_journey_amount: '' }]);
+      setJourneyRows(formData.journeyRows && formData.journeyRows.length > 0 ? formData.journeyRows : [{ journey_from_date: '', journey_from: '', journey_to_date: '', journey_to: '', journey_mode: 'Road', journey_amount: '' }]);
+      setLocalJourneyRows(formData.localJourneyRows && formData.localJourneyRows.length > 0 ? formData.localJourneyRows : [{ local_journey_date: '', local_journey_from: '', local_journey_to: '', local_journey_mode: 'Bus', local_journey_amount: '' }]);
     }
   }, [selectedFormType, formData.journeyRows, formData.localJourneyRows]);
 
@@ -206,7 +206,7 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
   };
 
   const addJourneyRow = () => {
-    setJourneyRows([...journeyRows, { journey_from: '', journey_to: '', journey_mode: 'Road', journey_amount: '' }]);
+    setJourneyRows([...journeyRows, { journey_from_date: '', journey_from: '', journey_to_date: '', journey_to: '', journey_mode: 'Road', journey_amount: '' }]);
   };
 
   const removeJourneyRow = (index) => {
@@ -214,7 +214,7 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
   };
 
   const addLocalJourneyRow = () => {
-    setLocalJourneyRows([...localJourneyRows, { local_journey_from: '', local_journey_to: '', local_journey_mode: 'Bus', local_journey_amount: '' }]);
+    setLocalJourneyRows([...localJourneyRows, { local_journey_date: '', local_journey_from: '', local_journey_to: '', local_journey_mode: 'Bus', local_journey_amount: '' }]);
   };
 
   const removeLocalJourneyRow = (index) => {
@@ -727,8 +727,8 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                       <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2 font-serif">Journey Details</h3>
                       {journeyRows.map((row, idx) => (
                         <div key={idx} className="border-b pb-2 mb-2 text-sm grid grid-cols-2 gap-2">
-                          <div><strong>From:</strong> {row.journey_from} ➔ <strong>To:</strong> {row.journey_to}</div>
-                          <div><strong>Mode:</strong> {row.journey_mode} · <strong>Amount:</strong> ₹{row.journey_amount}</div>
+                          <div><strong>From:</strong> {row.journey_from} {row.journey_from_date ? `(${new Date(row.journey_from_date).toLocaleDateString()})` : ''} <br/>➔ <strong>To:</strong> {row.journey_to} {row.journey_to_date ? `(${new Date(row.journey_to_date).toLocaleDateString()})` : ''}</div>
+                          <div><strong>Mode:</strong> {row.journey_mode} <br/><strong>Amount:</strong> ₹{row.journey_amount}</div>
                         </div>
                       ))}
                     </div>
@@ -737,8 +737,8 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                       <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2 font-serif">Local Journey Details</h3>
                       {localJourneyRows.map((row, idx) => (
                         <div key={idx} className="border-b pb-2 mb-2 text-sm grid grid-cols-2 gap-2">
-                          <div><strong>From:</strong> {row.local_journey_from} ➔ <strong>To:</strong> {row.local_journey_to}</div>
-                          <div><strong>Mode:</strong> {row.local_journey_mode} · <strong>Amount:</strong> ₹{row.local_journey_amount}</div>
+                          <div><strong>Date:</strong> {row.local_journey_date ? new Date(row.local_journey_date).toLocaleDateString() : '—'} <br/><strong>From:</strong> {row.local_journey_from} ➔ <strong>To:</strong> {row.local_journey_to}</div>
+                          <div><strong>Mode:</strong> {row.local_journey_mode} <br/><strong>Amount:</strong> ₹{row.local_journey_amount}</div>
                         </div>
                       ))}
                       <div className="pt-2 text-right font-bold text-gray-800">
@@ -867,10 +867,18 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                         <button type="button" onClick={addJourneyRow} className="text-xs font-bold text-indigo-600 hover:underline">+ Add Row</button>
                       </div>
                       {journeyRows.map((row, index) => (
-                        <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end border-b pb-3 mb-3">
+                        <div key={index} className="grid grid-cols-1 md:grid-cols-7 gap-3 items-end border-b pb-3 mb-3">
+                          <div className="md:col-span-1 flex flex-col">
+                            <label className="text-[10px] font-bold text-gray-500">From Date</label>
+                            <input type="date" value={row.journey_from_date || ''} onChange={(e) => handleJourneyChange(index, 'journey_from_date', e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
+                          </div>
                           <div className="md:col-span-1 flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500">From *</label>
                             <input type="text" value={row.journey_from} onChange={(e) => handleJourneyChange(index, 'journey_from', e.target.value)} required className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
+                          </div>
+                          <div className="md:col-span-1 flex flex-col">
+                            <label className="text-[10px] font-bold text-gray-500">To Date</label>
+                            <input type="date" value={row.journey_to_date || ''} onChange={(e) => handleJourneyChange(index, 'journey_to_date', e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
                           </div>
                           <div className="md:col-span-1 flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500">To *</label>
@@ -904,7 +912,11 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                         <button type="button" onClick={addLocalJourneyRow} className="text-xs font-bold text-indigo-600 hover:underline">+ Add Row</button>
                       </div>
                       {localJourneyRows.map((row, index) => (
-                        <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end border-b pb-3 mb-3">
+                        <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end border-b pb-3 mb-3">
+                          <div className="md:col-span-1 flex flex-col">
+                            <label className="text-[10px] font-bold text-gray-500">Date</label>
+                            <input type="date" value={row.local_journey_date || ''} onChange={(e) => handleLocalJourneyChange(index, 'local_journey_date', e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
+                          </div>
                           <div className="md:col-span-1 flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500">From *</label>
                             <input type="text" value={row.local_journey_from} onChange={(e) => handleLocalJourneyChange(index, 'local_journey_from', e.target.value)} required className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
