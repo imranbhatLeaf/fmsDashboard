@@ -13,7 +13,7 @@ function BankDetails({ data, onChange }) {
       </legend>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
         <Field label="Account Beneficiary Name" name="bankBeneficiaryName" value={data.bankBeneficiaryName} onChange={onChange} required />
-        <Field label="Bank" name="bankName" value={data.bankName} onChange={onChange} required />
+        <Field label="Bank Name" name="bankName" value={data.bankName} onChange={onChange} required />
         <Field label="Account Number" name="bankAccountNumber" value={data.bankAccountNumber} onChange={onChange} required />
         <Field label="Confirm Account Number" name="bankAccountNumberConfirm" value={data.bankAccountNumberConfirm} onChange={onChange} required />
         <Field label="IFSC Code" name="bankIfsc" value={data.bankIfsc} onChange={onChange} required />
@@ -37,8 +37,7 @@ function PersonalDetails({ data, onChange, showDesignation = true }) {
       <div className="md:col-span-2">
         <Field label="Address" name="address" value={data.address} onChange={onChange} required disabled />
       </div>
-      <Field label="Office Phone" name="officePhone" value={data.officePhone} onChange={onChange} disabled />
-      <Field label="Mobile" name="mobile" value={data.mobile} onChange={onChange} required disabled />
+      <Field label="Mobile" name="mobile" value={data.mobile} onChange={onChange} required />
       <Field label="Email" name="email" value={data.email} onChange={onChange} required disabled />
       <Field label="PAN Card" name="pan" value={data.pan} onChange={onChange} required />
       <Field label="Confirm PAN Card" name="panConfirm" value={data.panConfirm} onChange={onChange} required />
@@ -155,6 +154,18 @@ function FellowshipFields({ data, onChange }) {
   );
 }
 
+// Salary form fields (same as Fellowship but TDS applies on backend)
+function SalaryFields({ data, onChange }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Field label="Nature of Programme" name="natureOfProgramme" value={data.natureOfProgramme} onChange={onChange} required />
+      <Field label="Title of Programme" name="titleOfProgramme" value={data.titleOfProgramme} onChange={onChange} required />
+      <Field label="Rate (₹)" name="rate" value={data.rate} onChange={onChange} required type="number" />
+      <Field label="Total (₹)" name="total" value={data.total} onChange={onChange} required type="number" />
+    </div>
+  );
+}
+
 // TA/DA form fields
 function TadaFields({ data, onChange }) {
   return (
@@ -213,7 +224,7 @@ function ClaimSummary({ meta }) {
     "Fellowship": "fellowship",
     "Honorarium": "honorarium",
     "Refund": "refund",
-    "Salary": "honorarium",
+    "Salary": "salary",
   };
   const form_type = meta.form_type ||
     (meta.category === "TA/DA" ? "allowance" : categoryToFormType[meta.category] || meta.category?.toLowerCase());
@@ -398,8 +409,34 @@ export default function FormPage() {
       return;
     }
 
+    // Bank Name: minimum 6 characters, letters/spaces only (no numbers or special characters)
+    const bankName = formData.bankName?.trim();
+    const BANK_NAME_REGEX = /^[A-Za-z ]{6,}$/;
+    if (!bankName || !BANK_NAME_REGEX.test(bankName)) {
+      setFormError("Bank Name must be at least 6 characters and contain only letters.");
+      setSubmitting(false);
+      return;
+    }
+
     if (!ifsc || !ifsc.trim()) {
       setFormError("IFSC Code is required.");
+      setSubmitting(false);
+      return;
+    }
+
+    // IFSC Code: minimum 6 characters, alphanumeric only
+    const IFSC_REGEX = /^[A-Za-z0-9]{6,}$/;
+    if (!IFSC_REGEX.test(ifsc)) {
+      setFormError("IFSC Code must be at least 6 characters and contain only letters and numbers.");
+      setSubmitting(false);
+      return;
+    }
+
+    // Account Number: minimum 6 digits, numbers only
+    const accountNumber = formData.bankAccountNumber?.trim();
+    const ACCOUNT_NUMBER_REGEX = /^[0-9]{6,}$/;
+    if (!accountNumber || !ACCOUNT_NUMBER_REGEX.test(accountNumber)) {
+      setFormError("Account Number must be at least 6 digits and contain only numbers.");
       setSubmitting(false);
       return;
     }
@@ -535,6 +572,15 @@ export default function FormPage() {
             </h2>
             <BankDetails data={formData} onChange={handleChange} />
           </div>
+             {/* TA/DA Fields */}
+          {(meta.form_type === "tada" || meta.category === "TA/DA") && (
+            <div>
+              <h2 className="text-xs uppercase tracking-wider text-black font-bold mb-3 pb-1 border-b border-gray-100">
+                Travel & Journey Details
+              </h2>
+              <TadaFields data={formData} onChange={handleChange} />
+            </div>
+          )}
 
           {formError && (
             <p className="text-red-600 text-sm border-l-4 border-red-600 p-3 bg-red-50">{formError}</p>

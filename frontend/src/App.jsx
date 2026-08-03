@@ -8,6 +8,7 @@ import Registrar from './pages/Registrar'
 import Form from './pages/Form'
 import Receipt from './pages/Receipt'
 import Home from './pages/Home'
+import Track from './pages/Track'
 // inside Routes:
 const App = () => {
   return (
@@ -22,6 +23,7 @@ const App = () => {
           <Route path='/form/:token' element={<Form />} />
           <Route path='/complete/:token' element={<Form />} />
           <Route path='/receipt/:token' element={<Receipt />} />
+           <Route path='/track' element={<Track />} />
 
           {/* Protected */}
           <Route

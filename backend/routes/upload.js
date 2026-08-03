@@ -231,7 +231,7 @@ router.post("/", requireAuth, requireRole(["admin"]), upload.single("file"), asy
             amountAfterTds = amount;
           } else if (form_type === "fellowship") {
             amount = Number(row.fellowship_total);
-            amountAfterTds = Math.round(amount * (1 - TDS_RATE) * 100) / 100;
+            amountAfterTds = amount; // Fellowship is exempt from TDS
           } else if (form_type === "honorarium") {
             amount = Number(row.total_amount);
             amountAfterTds = Math.round(amount * (1 - TDS_RATE) * 100) / 100;

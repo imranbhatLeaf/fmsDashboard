@@ -6,13 +6,12 @@ import asssrLogo from "../assets/asssrFav.avif";
 import headerImg from "../assets/header.png";
 import RecordModal from "../components/RecordModal";
 import PreviewModal from "../components/PreviewModal";
-
 // Point this at your Express backend. In Vite, set VITE_API_BASE in your .env file.
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
 
 const PAYMENT_TYPES = [
-  { key: "Honorarium" },
   { key: "Salary" },
+  { key: "Honorarium" },
   { key: "Fellowship" },
   { key: "TA/DA" },
   { key: "Refund" },
@@ -184,10 +183,8 @@ export default function AdminDashboard() {
   }
 
   function copyLink(token) {
-    const link = `https://finance.asssr.org/form/${token}`;
-    navigator.clipboard.writeText(link);
-    alert("Link copied!");
-  }
+    const link = `https://finance.asssr.org/track`;
+    navigator.clipboard.writeText(link);}
 
   // Generic Add/Edit
   const [showRecordModal, setShowRecordModal] = useState(false);
@@ -335,7 +332,7 @@ export default function AdminDashboard() {
   const getRecordStatus = (r) => {
     if (r.rejected) return "Rejected";
     if (r.paymentProcessed) return "Paid";
-    if (r.registrarApproved) return "Ready for Payment";
+    if (r.registrarApproved) return "Approved by Registrar, Pending for Payment";
     if (r.adminApproved) return "Pending Registrar Approval";
     if (r.formSubmitted) return "Pending Admin Approval";
     return "Form Pending";
@@ -347,7 +344,7 @@ export default function AdminDashboard() {
       case "services": return r.services || r.component || "";
       case "category": return r.category || "";
       case "amount": return Number(r.amount) || 0;
-      case "amountAfterTds": return r.amountAfterTds ? Number(r.amountAfterTds) : Number(r.amount * 0.9) || 0;
+      case "amountAfterTds": return r.amountAfterTds ? Number(r.amountAfterTds) : ((r.category === "Refund" || r.category === "TA/DA" || r.category === "Fellowship") ? Number(r.amount) || 0 : Number(r.amount * 0.9) || 0);
       case "dateOfEntry": return new Date(r.dateOfEntry || r.createdAt).getTime();
       case "dateOfUpload": return r.dateOfUpload ? new Date(r.dateOfUpload).getTime() : 0;
       case "dateOfForwarding": return r.dateOfForwarding || r.adminApprovedAt ? new Date(r.dateOfForwarding || r.adminApprovedAt).getTime() : 0;
@@ -395,7 +392,7 @@ export default function AdminDashboard() {
         {/* Brand */}
         <div className="flex flex-col gap-0.5 px-2 border-r border-white/15 shrink-0 mr-4 pr-6">
           <span className="text-xl font-bold tracking-wide text-white" style={{ fontFamily: "Tahoma, Geneva, sans-serif" }}>AFMS</span>
-          <span className="text-[10px] text-white/50 font-bold">Admin Panel</span>
+          <span className="text-[10px] text-white/50 font-bold">Accounts (Admin) Panel</span>
         </div>
 
         {/* Nav */}
@@ -429,7 +426,7 @@ export default function AdminDashboard() {
         {/* Sign-out */}
         <div className="flex flex-row items-center gap-4 border-l border-white/15 pl-6 shrink-0">
           <span className="text-[10px] text-white/40 hidden md:block">
-            Signed in as <span className="text-white/80 font-bold">Admin</span>
+            Signed in as <span className="text-white/80 font-bold">Accounts (Admin)</span>
           </span>
           <button
             onClick={handleResetPassword}
@@ -461,11 +458,7 @@ export default function AdminDashboard() {
               <h1 className="font-serif text-2xl font-bold mb-1.5" style={{ color: DB }}>
                 Upload Entry
               </h1>
-              <p className="text-sm" style={{ fontFamily: "Tahoma, Geneva, sans-serif", color: "#556" }}>
-                <a href="/sample.csv" download="sample.csv" className="font-semibold underline underline-offset-2 cursor-pointer" style={{ color: DB }}>
-                  Download Sample CSV Template
-                </a>
-              </p>
+              
             </header>
 
             {/* Uploader Section */}
@@ -473,12 +466,18 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-sm font-semibold mb-1">Add a Single Entry Manually</p>
                 <p className="text-xs text-gray-500 mb-3">Choose a form format to add the record details directly.</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
                   <button
                     onClick={() => openAddModal("standard")}
                     className="flex items-center justify-center gap-2 text-sm font-bold py-3 px-4 rounded-lg transition-all border-2 border-dashed border-gray-300 hover:border-black hover:bg-gray-50 text-gray-700 hover:text-black"
                   >
                     <span>+</span> Standard Payment Form
+                  </button>
+                  <button
+                    onClick={() => openAddModal("salary")}
+                    className="flex items-center justify-center gap-2 text-sm font-bold py-3 px-4 rounded-lg transition-all border-2 border-dashed border-gray-300 hover:border-black hover:bg-gray-50 text-gray-700 hover:text-black"
+                  >
+                    <span>+</span> Salary Form
                   </button>
                   <button
                     onClick={() => openAddModal("refund")}
@@ -582,10 +581,10 @@ export default function AdminDashboard() {
 
             {!recordsLoading && !recordsError && records.length > 0 && (
                 <div className="w-full bg-white border border-gray-300 overflow-x-hidden">
-                  <table className="w-full border-collapse text-left" style={{ fontSize: "11px" }}>
+                  <table className="w-full border-collapse text-left" style={{ fontSize: "13px" }}>
                     <thead>
                       <tr>
-                        {renderSortableHeader("Name", "name")}
+                        {renderSortableHeader("Payee", "name")}
                         {renderSortableHeader("Comp", "services")}
                         {renderSortableHeader("Category", "category")}
                         {renderSortableHeader("Amount", "amount", true)}
@@ -593,7 +592,6 @@ export default function AdminDashboard() {
                         {renderSortableHeader("Uploaded", "dateOfUpload")}
                         {renderSortableHeader("Forwarded", "dateOfForwarding")}
                         {renderSortableHeader("Approved", "dateOfApproval")}
-                        {renderSortableHeader("Transferred", "dateOfTransfer")}
                         {renderSortableHeader("UTRN", "utrn")}
                         {renderSortableHeader("Status", "status")}
                         <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100">Actions</th>
@@ -615,22 +613,22 @@ export default function AdminDashboard() {
                             {Number(r.amount).toLocaleString("en-IN")}
                           </td>
                           <td className="px-0.5 py-1 border-r border-gray-300 text-right font-mono text-gray-700">
-                            {r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString("en-IN") : (r.category === "Refund" || r.category === "TA/DA" ? Number(r.amount).toLocaleString("en-IN") : Number(r.amount * 0.9).toLocaleString("en-IN"))}
+                            {r.amountAfterTds ? Number(r.amountAfterTds).toLocaleString("en-IN") : (r.category === "Refund" || r.category === "TA/DA" || r.category === "Fellowship" ? Number(r.amount).toLocaleString("en-IN") : Number(r.amount * 0.9).toLocaleString("en-IN"))}
                           </td>
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfUpload || r.dateOfEntry || r.createdAt)}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfForwarding || r.adminApprovedAt)}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfApproval || r.registrarApprovedAt)}</td>
-                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfTransfer)}</td>
+          
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-500 font-mono text-[11px]">{r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "—"}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300">
                             <span
-                              className="inline-block text-[9px] font-bold uppercase tracking-wider px-1 py-0.2 rounded border"
+                              className="inline-block text-[11px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
                               style={
                                 status === "Paid"
                                   ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
                                   : status === "Rejected"
                                   ? { background: "#fef2f2", color: "#dc2626", borderColor: "#fca5a5" }
-                                  : status === "Ready for Payment" || status === "Pending Admin Approval"
+                                  : status === "Approved by Registrar, Pending for Payment" || status === "Pending Admin Approval"
                                   ? { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
                                   : status === "Pending Registrar Approval"
                                   ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
@@ -638,72 +636,80 @@ export default function AdminDashboard() {
                               }
                             >
                               {status}
-                            </span>
+  {status === "Paid" && r.dateOfTransfer && (
+    <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.dateOfTransfer)}</div>
+  )}
+  {status === "Rejected" && r.rejectedAt && (
+    <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.rejectedAt)}</div>
+  )}
+  {status === "Approved by Registrar, Pending for Payment" && (r.registrarApprovedAt || r.dateOfApproval) && (
+    <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.registrarApprovedAt || r.dateOfApproval)}</div>
+  )}
+  {status === "Pending Registrar Approval" && (r.adminApprovedAt || r.dateOfForwarding) && (
+    <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.adminApprovedAt || r.dateOfForwarding)}</div>
+  )}
+  {status === "Pending Admin Approval" && r.dateOfUpload && (
+    <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.dateOfUpload)}</div>
+  )}
+</span>
                           </td>
                           <td className="px-0.5 py-1">
                             <div className="flex items-center gap-0.5 flex-wrap">
                               <button
                                 onClick={() => setPreviewRecord(r)}
-                                className="text-[9px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-1 py-0.2 rounded transition-colors shadow-sm bg-white"
+                                className="text-[11px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-1.5 py-0.5 rounded transition-colors shadow-sm bg-white"
                               >
                                 Preview
                               </button>
-                              {!r.paymentProcessed && !r.registrarApproved && (
-                              <button
-                                onClick={() => openRecordModal(r)}
-                                className="text-[9px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-1 py-0.2 rounded transition-colors shadow-sm bg-white"
-                              >
+                               {!r.paymentProcessed && !r.registrarApproved && !r.adminApproved && (
+                               <button
+                               onClick={() => openRecordModal(r)}
+                               className="text-[11px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-1.5 py-0.5 rounded transition-colors shadow-sm bg-white"
+                                 >
                                 Edit
-                              </button>
-                              )}
-                              {status === "Form Pending" && (
-                                <button
-                                  onClick={() => copyLink(r.token)}
-                                  className="text-[9px] font-bold uppercase tracking-wider text-black bg-gray-200 hover:bg-gray-300 px-1 py-0.2 rounded transition-colors"
-                                >
-                                  Link
-                                </button>
-                              )}
+                               </button>
+                                )} 
+                              
                               {status === "Pending Admin Approval" && (
                                 <>
                                   <button
                                     onClick={() => openAdminApproveModal(r)}
-                                    className="text-[9px] font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 px-1 py-0.2 rounded transition-colors shadow-sm"
+                                    className="text-[11px] font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 px-1.5 py-0.5 rounded transition-colors shadow-sm"
                                   >
                                     Approve
                                   </button>
                                   <button
                                     onClick={() => handleAdminReject(r._id)}
-                                    className="text-[9px] font-bold uppercase tracking-wider text-red-600 px-1 py-0.2 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
+                                    className="text-[11px] font-bold uppercase tracking-wider text-red-600 px-1.5 py-0.5 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
                                   >
                                     Reject
                                   </button>
                                 </>
                               )}
                               {status === "Rejected" && r.rejectionReason && (
-                                <span className="text-[9px] italic text-red-500 max-w-[100px] truncate" title={r.rejectionReason}>
-                                  ↳ {r.rejectionReason}
+                                <span className="text-[11px] font-semibold text-red-600 block mt-1" title={r.rejectionReason}>
+                                  Reason: {r.rejectionReason}
                                 </span>
                               )}
                               {status === "Pending Registrar Approval" && (
                                 <button
                                   onClick={() => handleAdminReject(r._id)}
-                                  className="text-[9px] font-bold uppercase tracking-wider text-red-600 px-1 py-0.2 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
+                                  className="text-[11px] font-bold uppercase tracking-wider text-red-600 px-1.5 py-0.5 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
                                 >
                                   Reject
                                 </button>
                               )}
-                              {status === "Ready for Payment" && (
+                              {status === "Approved by Registrar, Pending for Payment" && (
                                 <>
                                   <button
                                     onClick={() => openProcessModal(r)}
-                                    className="text-[9px] font-bold uppercase tracking-wider text-white bg-green-600 hover:bg-green-700 px-1 py-0.2 rounded transition-colors shadow-sm"
+                                    className="text-[11px] font-bold uppercase tracking-wider text-white bg-green-600 hover:bg-green-700 px-1.5 py-0.5 rounded transition-colors shadow-sm"
                                   >
                                     Process
                                   </button>
                                   <button
                                     onClick={() => handleAdminReject(r._id)}
-                                    className="text-[9px] font-bold uppercase tracking-wider text-red-600 px-1 py-0.2 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
+                                    className="text-[11px] font-bold uppercase tracking-wider text-red-600 px-1.5 py-0.5 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
                                   >
                                     Reject
                                   </button>
@@ -712,7 +718,7 @@ export default function AdminDashboard() {
                               {status === "Paid" && (
                                 <button
                                   onClick={() => window.open(`/receipt/${r.token}`, '_blank')}
-                                  className="text-[9px] font-bold uppercase tracking-wider text-white bg-black hover:bg-gray-800 px-1 py-0.2 rounded transition-colors shadow-sm"
+                                  className="text-[11px] font-bold uppercase tracking-wider text-white bg-black hover:bg-gray-800 px-1.5 py-0.5 rounded transition-colors shadow-sm"
                                 >
                                   Receipt
                                 </button>
@@ -964,4 +970,4 @@ export default function AdminDashboard() {
       )}
     </div>
   );
-}
+}

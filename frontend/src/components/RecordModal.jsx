@@ -56,8 +56,6 @@ const FELLOWSHIP_FIELDS_SPEC = {
     { label: "Claimant Name", name: "name", required: true, type: "text" },
     { label: "Designation", name: "designation", required: true, type: "text" },
     { label: "Address", name: "address", required: true, type: "text" },
-    { label: "Telephone (Office)", name: "telephone_office", type: "text" },
-    { label: "Telephone (Mobile)", name: "telephone_mobile", type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
   ],
   programmeDetails: [
@@ -89,8 +87,6 @@ const TADA_FIELDS_SPEC = {
     { label: "Claimant Name", name: "name", required: true, type: "text" },
     { label: "Designation", name: "designation", required: true, type: "text" },
     { label: "Address", name: "address", required: true, type: "text" },
-    { label: "Telephone (Office)", name: "telephone_office", type: "text" },
-    { label: "Telephone (Mobile)", name: "telephone_mobile", type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
   ],
   officeUse: [
@@ -115,8 +111,6 @@ const HONORARIUM_FIELDS_SPEC = {
     { label: "Claimant Name", name: "name", required: true, type: "text" },
     { label: "Designation", name: "designation", required: true, type: "text" },
     { label: "Address", name: "address", required: true, type: "text" },
-    { label: "Telephone (Office)", name: "telephone_office", type: "text" },
-    { label: "Telephone (Mobile)", name: "telephone_mobile", type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
   ],
   programmeDetails: [
@@ -159,6 +153,8 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
       ? 'tada'
       : record?.form_type === 'honorarium' || record?.category === 'Honorarium'
       ? 'honorarium'
+      : record?.form_type === 'salary' || record?.category === 'Salary'
+      ? 'salary'
       : (defaultFormType || 'standard')
   );
   const [isEditing, setIsEditing] = useState(isAdd);
@@ -261,6 +257,30 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
         dataToSave.grand_total = journeySum + localSum;
         dataToSave.amount = Number(formData.passed_for_payment_amount || dataToSave.grand_total);
         dataToSave.claimant_signature = formData.claimant_signature;
+      } else if (selectedFormType === 'salary') {
+        dataToSave.form_type = 'salary';
+        dataToSave.category = 'Salary';
+        dataToSave.name = formData.name;
+        dataToSave.email = formData.email;
+        dataToSave.designation = formData.designation;
+        dataToSave.address = formData.address;
+        dataToSave.programme_nature = formData.nature_of_programme || formData.programme_nature;
+        dataToSave.programme_title = formData.title_of_programme || formData.programme_title;
+        dataToSave.rate = Number(formData.rate || 0);
+        dataToSave.total_amount = Number(formData.total || 0);
+        dataToSave.amount = Number(formData.passed_for_payment_amount || formData.total || formData.amount || 0);
+      } else if (selectedFormType === 'salary') {
+        dataToSave.form_type = 'salary';
+        dataToSave.category = 'Salary';
+        dataToSave.name = formData.name;
+        dataToSave.email = formData.email;
+        dataToSave.designation = formData.designation;
+        dataToSave.address = formData.address;
+        dataToSave.programme_nature = formData.nature_of_programme || formData.programme_nature;
+        dataToSave.programme_title = formData.title_of_programme || formData.programme_title;
+        dataToSave.rate = Number(formData.rate || 0);
+        dataToSave.total_amount = Number(formData.total || 0);
+        dataToSave.amount = Number(formData.passed_for_payment_amount || formData.total || formData.amount || 0);
       } else if (selectedFormType === 'honorarium') {
         dataToSave.form_type = 'honorarium';
         dataToSave.category = 'Honorarium';
@@ -410,6 +430,8 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                       refund: { component: 'ASSSR', category: 'Refund' },
                       fellowship: { component: 'ASSSR', category: 'Fellowship' },
                       tada: { component: 'ASSSR', category: 'TA/DA' },
+                      salary: { component: 'ASSSR', category: 'Salary' },
+                      salary: { component: 'ASSSR', category: 'Salary' },
                       honorarium: { component: 'ASSSR', category: 'Honorarium' },
                     }[e.target.value] || { component: 'ASSSR', category: 'Salary' };
                     setFormData(defaults);
@@ -417,6 +439,7 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                   className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black animate-fadeIn"
                 >
                   <option value="standard">Standard Payment Form</option>
+                  <option value="salary">Salary Form</option>
                   <option value="refund">Refund Form</option>
                   <option value="fellowship">Fellowship Bill Form</option>
                   <option value="tada">Travelling & TA/DA Form</option>
@@ -479,14 +502,27 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                       })}
                     </div>
 
+                  </>
+                ) : selectedFormType === 'salary' ? (
+                  <>
                     <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Office Use Only</h3>
-                      {REFUND_FIELDS_SPEC.officeUse.map(field => {
-                        let val = formData[field.name] || formData[field.name.replace(/_([a-z])/g, (g) => g[1].toUpperCase())];
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Claimant Info</h3>
+                      {FELLOWSHIP_FIELDS_SPEC.claimantInfo.map(field => {
+                        const val = formData[field.name];
                         if (!val) return null;
-                        if (field.type === 'date' && val.includes('T')) {
-                          val = val.split('T')[0];
-                        }
+                        return (
+                          <div key={field.name} className="flex justify-between text-sm">
+                            <span className="text-gray-500 font-medium">{field.label}:</span>
+                            <span className="font-semibold text-gray-800">{val}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Salary Details</h3>
+                      {FELLOWSHIP_FIELDS_SPEC.programmeDetails.map(field => {
+                        let val = formData[field.name] || formData[field.name === 'nature_of_programme' ? 'programme_nature' : field.name === 'title_of_programme' ? 'programme_title' : field.name === 'total' ? 'total_amount' : ''];
+                        if (!val) return null;
                         return (
                           <div key={field.name} className="flex justify-between text-sm">
                             <span className="text-gray-500 font-medium">{field.label}:</span>
@@ -517,23 +553,6 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                       {FELLOWSHIP_FIELDS_SPEC.programmeDetails.map(field => {
                         let val = formData[field.name] || formData[field.name === 'nature_of_programme' ? 'programme_nature' : field.name === 'title_of_programme' ? 'programme_title' : field.name === 'total' ? 'total_amount' : ''];
                         if (!val) return null;
-                        return (
-                          <div key={field.name} className="flex justify-between text-sm">
-                            <span className="text-gray-500 font-medium">{field.label}:</span>
-                            <span className="font-semibold text-gray-800">{val}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Office Use Only</h3>
-                      {FELLOWSHIP_FIELDS_SPEC.officeUse.map(field => {
-                        let val = formData[field.name] || formData[field.name.replace(/_([a-z])/g, (g) => g[1].toUpperCase())];
-                        if (!val) return null;
-                        if (field.type === 'date' && val.includes('T')) {
-                          val = val.split('T')[0];
-                        }
                         return (
                           <div key={field.name} className="flex justify-between text-sm">
                             <span className="text-gray-500 font-medium">{field.label}:</span>
@@ -582,23 +601,6 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                       </div>
                       {formData.remarks && <div className="text-xs text-gray-500"><strong>Remarks:</strong> {formData.remarks}</div>}
                     </div>
-
-                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2 font-serif">Office Use Only</h3>
-                      {TADA_FIELDS_SPEC.officeUse.map(field => {
-                        let val = formData[field.name] || formData[field.name.replace(/_([a-z])/g, (g) => g[1].toUpperCase())];
-                        if (!val) return null;
-                        if (field.type === 'date' && val.includes('T')) {
-                          val = val.split('T')[0];
-                        }
-                        return (
-                          <div key={field.name} className="flex justify-between text-sm">
-                            <span className="text-gray-500 font-medium">{field.label}:</span>
-                            <span className="font-semibold text-gray-800">{val}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
                   </>
                 ) : selectedFormType === 'honorarium' ? (
                   <>
@@ -630,22 +632,6 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                       })}
                     </div>
 
-                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2 font-serif">Office Use Only</h3>
-                      {HONORARIUM_FIELDS_SPEC.officeUse.map(field => {
-                        let val = formData[field.name] || formData[field.name.replace(/_([a-z])/g, (g) => g[1].toUpperCase())];
-                        if (!val) return null;
-                        if (field.type === 'date' && val.includes('T')) {
-                          val = val.split('T')[0];
-                        }
-                        return (
-                          <div key={field.name} className="flex justify-between text-sm">
-                            <span className="text-gray-500 font-medium">{field.label}:</span>
-                            <span className="font-semibold text-gray-800">{val}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
                   </>
                 ) : (
                   <div className="space-y-3">
@@ -680,10 +666,19 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                       </div>
                     </div>
 
+                  </>
+                ) : selectedFormType === 'salary' ? (
+                  <>
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
-                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Office Use Only</h3>
+                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Claimant Info</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {REFUND_FIELDS_SPEC.officeUse.map(renderInputField)}
+                        {FELLOWSHIP_FIELDS_SPEC.claimantInfo.map(renderInputField)}
+                      </div>
+                    </div>
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Salary Details</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {FELLOWSHIP_FIELDS_SPEC.programmeDetails.map(renderInputField)}
                       </div>
                     </div>
                   </>
@@ -703,12 +698,6 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                       </div>
                     </div>
 
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
-                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Office Use Only</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {FELLOWSHIP_FIELDS_SPEC.officeUse.map(renderInputField)}
-                      </div>
-                    </div>
                   </>
                 ) : selectedFormType === 'tada' ? (
                   <>
@@ -803,12 +792,6 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                       </div>
                     </div>
 
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
-                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Office Use Only</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {TADA_FIELDS_SPEC.officeUse.map(renderInputField)}
-                      </div>
-                    </div>
                   </>
                 ) : selectedFormType === 'honorarium' ? (
                   <>
@@ -826,12 +809,7 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                       </div>
                     </div>
 
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
-                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Office Use Only</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {HONORARIUM_FIELDS_SPEC.officeUse.map(renderInputField)}
-                      </div>
-                    </div>
+              
                   </>
                 ) : (
                   <div className="space-y-4">

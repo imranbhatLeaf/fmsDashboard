@@ -224,7 +224,7 @@ export default function ReceiptPage() {
             <Row label="Name of Claimant / Payee" value={record.name} />
             <Row label="Bank" value={formData.bankName || "—"} />
             <Row label="Account Number" value={formData.bankAccountNumber || "—"} />
-            <Row label="Indian Financial System Code" value={formData.bankIfsc || "—"} />
+            <Row label="IFSC Code" value={formData.bankIfsc || "—"} />
             <Row label="Payment Type" value={record.category} />
             <Row label="Bank Reference No." value={record.bankReferenceNo || "—"} />
             <Row label="Component" value={record.services} />

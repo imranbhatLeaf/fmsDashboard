@@ -191,7 +191,9 @@ router.get("/:token", rateLimiter, async (req, res) => {
     }
 
     let approvalStatus = "Pending Verification & Approval";
-    if (record.paymentProcessed) {
+    if (record.rejected) {
+      approvalStatus = "Rejected" + (record.rejectionReason ? ": " + record.rejectionReason : "");
+    } else if (record.paymentProcessed) {
       approvalStatus = "Payment Processed (Completed)";
     } else if (record.registrarApproved) {
       approvalStatus = "Approved by Registrar, Pending for Payment";
@@ -271,12 +273,30 @@ router.post("/:token", rateLimiter, async (req, res) => {
       return res.status(400).json({ message: "Account number is required." });
     }
 
+    // Account Number: minimum 6 digits, numbers only
+    const ACCOUNT_NUMBER_REGEX = /^[0-9]{6,}$/;
+    if (!ACCOUNT_NUMBER_REGEX.test(bankAccountNumber.trim())) {
+      return res.status(400).json({ message: "Account Number must be at least 6 digits and contain only numbers." });
+    }
+
     if (!bankName || !bankName.trim()) {
       return res.status(400).json({ message: "Bank name is required." });
     }
 
+    // Bank Name: minimum 6 characters, letters/spaces only (no numbers or special characters)
+    const BANK_NAME_REGEX = /^[A-Za-z ]{6,}$/;
+    if (!BANK_NAME_REGEX.test(bankName.trim())) {
+      return res.status(400).json({ message: "Bank Name must be at least 6 characters and contain only letters." });
+    }
+
     if (!bankIfsc || !bankIfsc.trim()) {
       return res.status(400).json({ message: "IFSC code is required." });
+    }
+
+    // IFSC Code: minimum 6 characters, alphanumeric only
+    const IFSC_REGEX = /^[A-Za-z0-9]{6,}$/;
+    if (!IFSC_REGEX.test(bankIfsc.trim())) {
+      return res.status(400).json({ message: "IFSC Code must be at least 6 characters and contain only letters and numbers." });
     }
 
     if (!bankBranchAddress || !bankBranchAddress.trim()) {

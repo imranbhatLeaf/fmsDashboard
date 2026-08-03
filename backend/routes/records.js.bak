@@ -293,7 +293,7 @@ router.post("/", requireAuth, requireRole(["admin"]), async (req, res) => {
     // Recalculate TDS if amount is provided
     if (data.amount !== undefined && data.amount !== null) {
       data.amount = Number(data.amount);
-      if (data.category === "Refund" || data.category === "TA/DA" || data.category === "Fellowship") {
+      if (data.category === "Refund" || data.category === "TA/DA") {
         data.amountAfterTds = data.amount;
       } else {
         data.amountAfterTds = Math.round(data.amount * 0.9 * 100) / 100;
@@ -674,7 +674,7 @@ router.put("/:id/edit", requireAuth, requireRole(["admin"]), async (req, res) =>
       } else {
         record.amount = Number(updates.amount);
         const category = updates.category || record.category;
-        if (category === "Refund" || category === "TA/DA" || category === "Fellowship") {
+        if (category === "Refund" || category === "TA/DA") {
           record.amountAfterTds = record.amount;
         } else {
           record.amountAfterTds = Math.round(record.amount * 0.9 * 100) / 100;
