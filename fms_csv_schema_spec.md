@@ -81,7 +81,6 @@ Store the raw value and render whichever label the component's template expects.
 | `payee_status` | enum | system-managed | Admin leaves blank; default `pending` on ingest |
 | `payee_link_token` | string | system-managed | Generate server-side (see §4) — reject upload if admin supplies a value here, to prevent token collisions/spoofing |
 | `pan_number` | string | payee-filled | Must be blank on admin upload. 10-char PAN format validated when payee submits. |
-| `aadhaar_number` | string | payee-filled, optional | Blank on admin upload. Optional per source forms — don't hard-require at payee-submit step. |
 | `beneficiary_name` | string | payee-filled | Blank on admin upload |
 | `account_number` | string | payee-filled | Blank on admin upload |
 | `bank_name` | string | payee-filled | Blank on admin upload |
@@ -126,7 +125,7 @@ Use this to drive row-level validation on ingest — reject or flag rows missing
 5. **Payee-facing page** (`/complete/{token}`):
    - Look up claim by token. If not found or `payee_status = 'completed'`, show appropriate message (don't leak whether token ever existed vs. already used — same generic message either way).
    - Render a read-only summary of the claim (name, programme, amounts) built from the `component` + `form_type` template.
-   - Editable fields: only `pan_number`, `aadhaar_number` (optional), `beneficiary_name`, `account_number`, `bank_name`, `ifsc_code`, `bank_branch_address`.
+   - Editable fields: only `pan_number`, `beneficiary_name`, `account_number`, `bank_name`, `ifsc_code`, `bank_branch_address`.
    - On submit: validate PAN/IFSC formats, update row, set `payee_status = 'completed'`, generate the filled PDF using the component-specific template, and (optionally) notify admin/treasurer.
 6. **Token expiry**: consider a TTL (e.g. 30 days) after which `payee_status` auto-flips to `expired` and the link shows "please contact the office to resend."
 
@@ -153,7 +152,7 @@ Note: only VMI honorarium and VMI allowance templates were provided (no VMI fell
 
 ## 6. Security notes for the agent
 
-- Never include `pan_number`, `aadhaar_number`, or bank fields in the admin-facing CSV export/import — those columns should only ever be written by the payee-facing endpoint, never by admin upload. Treat any admin-uploaded row with those fields pre-filled as a validation error.
+- Never include `pan_number` or bank fields in the admin-facing CSV export/import — those columns should only ever be written by the payee-facing endpoint, never by admin upload. Treat any admin-uploaded row with those fields pre-filled as a validation error.
 - `payee_link_token` must not be guessable or sequential — use a CSPRNG.
 - Rate-limit the `/complete/{token}` endpoint to prevent token brute-forcing.
-- Log PAN/Aadhaar access separately (audit trail) since these are sensitive PII under Indian data protection norms.
+- Log PAN access separately (audit trail) since it is sensitive PII under Indian data protection norms.

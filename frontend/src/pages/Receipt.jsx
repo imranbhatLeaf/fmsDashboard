@@ -42,9 +42,9 @@ function Barcode({ value }) {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
-    const barWidth = 2;
-    const barHeight = 50;
-    const padding = 10;
+    const barWidth = 1.3;
+    const barHeight = 24;
+    const padding = 3;
 
     const chars = value.toUpperCase().split("");
     const pattern = chars.flatMap((c) => {
@@ -59,26 +59,21 @@ function Barcode({ value }) {
 
     const totalWidth = pattern.length * barWidth + padding * 2;
     canvas.width = totalWidth;
-    canvas.height = barHeight + 20;
+    canvas.height = barHeight;
 
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     pattern.forEach((bit, i) => {
-      ctx.fillStyle = bit ? "#1b2430" : "#ffffff";
+      ctx.fillStyle = bit ? "#000000" : "#ffffff";
       ctx.fillRect(padding + i * barWidth, 0, barWidth, barHeight);
     });
-
-    ctx.fillStyle = "#1b2430";
-    ctx.font = "9px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(`${value}`, totalWidth / 2, barHeight + 14);
   }, [value]);
 
   return (
     <canvas
       ref={canvasRef}
-      style={{ imageRendering: "pixelated", maxWidth: "100%" }}
+      style={{ imageRendering: "pixelated", maxWidth: "100%", display: "block" }}
     />
   );
 }
@@ -136,159 +131,149 @@ export default function ReceiptPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white py-10 px-4">
+    <div className="min-h-screen bg-[#eceded] py-8 px-4 font-sans">
       <style>{`
+        .receipt-serif { font-family: Georgia, 'Times New Roman', serif; }
+        table.doc-table td { vertical-align: top; }
         @media print {
           @page {
             size: A4 portrait;
-            margin: 8mm 10mm;
+            margin: 14mm 16mm;
           }
           body {
             background: white !important;
-            font-size: 11px !important;
-            line-height: 1.25 !important;
-          }
-          .receipt-container {
-            border: 1px solid black !important;
-            padding: 14px 18px !important;
-            margin: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            box-shadow: none !important;
-          }
-          /* Shrink spacing to fit on a single page */
-          .mb-6 {
-            margin-bottom: 10px !important;
-          }
-          .mb-2 {
-            margin-bottom: 4px !important;
-          }
-          .pb-4 {
-            padding-bottom: 6px !important;
-          }
-          table {
-            margin-bottom: 10px !important;
-          }
-          td {
-            padding-top: 4px !important;
-            padding-bottom: 4px !important;
-            font-size: 11px !important;
-          }
-          canvas {
-            height: 35px !important;
-            margin-top: 2px !important;
-          }
-          p, ul, li {
-            margin-bottom: 4px !important;
           }
         }
       `}</style>
 
       {/* Print button */}
-      <div className="max-w-3xl mx-auto mb-4 flex justify-end print:hidden">
+      <div className="max-w-[794px] mx-auto mb-3 flex justify-end print:hidden">
         <button
           onClick={() => window.print()}
-          className="bg-black text-white text-sm font-semibold px-5 py-2.5 hover:bg-gray-800 transition-colors"
+          className="bg-black text-white text-xs font-semibold px-4 py-2 hover:bg-gray-800 transition-colors"
         >
           Print / Save PDF
         </button>
       </div>
 
       {/* Receipt */}
-      <div className="max-w-3xl mx-auto bg-white border border-black p-8 receipt-container">
-        {/* Header */}
-        <div className="text-center mb-6 border-b border-black pb-4">
-          <h1 className="font-bold text-xl">{SERVICE_FULL[record.services]}</h1>
-          <p className="text-sm font-semibold mt-1">Financial Year: {getCurrentFY()}</p>
-        </div>
+      <div className="receipt-serif max-w-[794px] mx-auto bg-white border border-black px-10 py-7">
 
-        {/* Receipt title */}
-        <div className="flex justify-between items-start mb-6">
+        {/* Letterhead */}
+        <div className="text-center mb-0.5">
+          <p className="font-sans text-[8px] tracking-[0.18em] text-gray-500 uppercase mb-0.5">Official Payment Receipt</p>
+          <h1 className="font-bold text-[14px] leading-tight tracking-wide">{SERVICE_FULL[record.services]?.toUpperCase()}</h1>
+          <p className="text-[9.5px] text-gray-700">Financial Year {getCurrentFY()}</p>
+        </div>
+        <div className="border-t-[2px] border-black mt-2 mb-0.5"></div>
+        <div className="border-t border-black mb-3"></div>
+
+        {/* Title bar */}
+        <div className="font-sans flex items-center justify-between mb-3">
           <div>
-            <p className="font-bold">{record.category} Receipt</p>
-            <p className="text-sm">For Record Purposes Against Payments Made</p>
+            <p className="font-bold text-[10.5px] uppercase tracking-wide">{record.category} Receipt</p>
+            <p className="text-[8.5px] text-gray-500">For record purposes against payment made</p>
           </div>
-          <div className="text-right flex flex-col items-end">
-            <p className="text-xs font-bold">Unique Transaction Reference Number</p>
-            <p className="font-mono text-sm font-bold">{utrn}</p>
-            <div className="mt-1">
-              <Barcode value={utrn} />
-            </div>
+          <div className="text-right">
+            <p className="text-[7.5px] font-semibold uppercase tracking-wide text-gray-500">UTR No.</p>
+            <p className="font-mono font-bold text-[10.5px]">{utrn}</p>
           </div>
         </div>
 
-        {/* Main details */}
-        <table className="w-full text-sm border-collapse border border-black mb-6">
-          <tbody>
-            <Row label="Date of Transfer" value={formatDate(record.dateOfTransfer || record.paymentProcessedAt)} />
-            <Row label="Name of Claimant / Payee" value={record.name} />
-            <Row label="Bank" value={formData.bankName || "—"} />
-            <Row label="Account Number" value={formData.bankAccountNumber || "—"} />
-            <Row label="IFSC Code" value={formData.bankIfsc || "—"} />
-            <Row label="Payment Type" value={record.category} />
-            <Row label="Bank Reference No." value={record.bankReferenceNo || "—"} />
-            <Row label="Component" value={record.services} />
-          </tbody>
-        </table>
-
-        {/* Settlement */}
-        <div className="mb-2 font-bold text-sm">Details of Payment Settlement</div>
-        <table className="w-full text-sm border-collapse border border-black mb-6">
+        {/* Payee / bank details table */}
+        <table className="doc-table w-full border-collapse border border-black text-[10px] mb-3 font-sans">
           <tbody>
             <tr>
-              <td className="px-4 py-2 border border-black font-bold w-48">Gross Amount</td>
-              <td className="px-4 py-2 border border-black text-right">₹ {formatAmount(gross)}</td>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1 w-[22%]">Name of Payee</td>
+              <td className="border border-black px-2 py-1" colSpan={3}>{record.name}</td>
             </tr>
             <tr>
-              <td className="px-4 py-2 border border-black font-bold">Less: Tax Deducted at Source</td>
-              <td className="px-4 py-2 border border-black text-right">₹ {formatAmount(tds)}</td>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1">Date of Transfer</td>
+              <td className="border border-black px-2 py-1 w-[28%]">{formatDate(record.dateOfTransfer || record.paymentProcessedAt)}</td>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1 w-[22%]">Payment Type</td>
+              <td className="border border-black px-2 py-1">{record.category}</td>
             </tr>
             <tr>
-              <td className="px-4 py-2 border border-black font-bold">Net Amount Payable</td>
-              <td className="px-4 py-2 border border-black text-right font-bold">₹ {formatAmount(net)}</td>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1">Component</td>
+              <td className="border border-black px-2 py-1">{record.services}</td>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1">Bank</td>
+              <td className="border border-black px-2 py-1">{formData.bankName || "—"}</td>
+            </tr>
+            <tr>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1">Account Number</td>
+              <td className="border border-black px-2 py-1">{formData.bankAccountNumber || "—"}</td>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1">IFSC Code</td>
+              <td className="border border-black px-2 py-1">{formData.bankIfsc || "—"}</td>
+            </tr>
+            <tr>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1">Bank Ref. No.</td>
+              <td className="border border-black px-2 py-1" colSpan={3}>{record.bankReferenceNo || "—"}</td>
             </tr>
           </tbody>
         </table>
 
-        {/* Dates */}
-        <div className="mb-6 p-4 border border-black text-sm">
-          <p className="font-bold mb-2">Processing Dates:</p>
-          <ul className="list-style-none space-y-1 pl-0">
-            <li><strong>Date of Entry:</strong> {formatDate(record.dateOfEntry || record.createdAt)}</li>
-            <li><strong>Date of Upload:</strong> {formatDate(record.dateOfUpload || record.updatedAt || record.createdAt)}</li>
-            <li><strong>Date of Forwarding:</strong> {formatDate(record.dateOfForwarding || record.adminApprovedAt)}</li>
-            <li><strong>Date of Approval:</strong> {formatDate(record.dateOfApproval || record.registrarApprovedAt)}</li>
-          </ul>
-        </div>
+        {/* Settlement table */}
+        <table className="doc-table w-full border-collapse border border-black text-[10px] mb-3 font-sans">
+          <tbody>
+            <tr>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1 w-1/3">Gross Amount</td>
+              <td className="border border-black px-2 py-1 text-right w-2/3" colSpan={2}>₹ {formatAmount(gross)}</td>
+            </tr>
+            <tr>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1">Tax Deducted at Source</td>
+              <td className="border border-black px-2 py-1 text-right" colSpan={2}>₹ {formatAmount(tds)}</td>
+            </tr>
+            <tr>
+              <td className="border border-black bg-black text-white font-bold px-2 py-1">Net Amount Payable</td>
+              <td className="border border-black bg-black text-white font-bold px-2 py-1 text-right" colSpan={2}>₹ {formatAmount(net)}</td>
+            </tr>
+          </tbody>
+        </table>
 
-        <div className="mb-6 border border-black p-4 text-sm">
-          <p className="font-bold mb-2">Verification</p>
-          <p className="leading-relaxed">
-            {record.category} Receipt electronically transmitted on{" "}
-            <strong>{formatDate(submittedAt)}</strong> at{" "}
-            <strong>{formatTime(submittedAt)}</strong> for an amount of{" "}
-            <strong>₹ {formatAmount(net)}/-</strong> from Internet Protocol address{" "}
-            <strong>{formatIP(record.submittedIp)}</strong> and verified by{" "}
-            <strong>{record.name}</strong> having{" "}
-            <strong>Permanent Account Number ({formData.pan || "—"})</strong> using Electronic Verification Code{" "}
-            <strong>{utrn}</strong> generated through Email / Mobile One-Time Password mode.
-          </p>
-        </div>
+        {/* Processing dates table */}
+        <table className="doc-table w-full border-collapse border border-black text-[10px] mb-3 font-sans">
+          <tbody>
+            <tr>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1 w-1/4">Entry</td>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1 w-1/4">Upload</td>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1 w-1/4">Forwarding</td>
+              <td className="border border-black bg-gray-50 font-semibold px-2 py-1 w-1/4">Approval</td>
+            </tr>
+            <tr>
+              <td className="border border-black px-2 py-1">{formatDate(record.dateOfEntry || record.createdAt)}</td>
+              <td className="border border-black px-2 py-1">{formatDate(record.dateOfUpload || record.updatedAt || record.createdAt)}</td>
+              <td className="border border-black px-2 py-1">{formatDate(record.dateOfForwarding || record.adminApprovedAt)}</td>
+              <td className="border border-black px-2 py-1">{formatDate(record.dateOfApproval || record.registrarApprovedAt)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* Barcode + verification */}
+        <table className="doc-table w-full border-collapse border border-black text-[8.5px] mb-3 font-sans">
+          <tbody>
+            <tr>
+              <td className="border border-black px-2 py-1.5 align-middle" style={{ width: "110px" }}>
+                <Barcode value={utrn} />
+              </td>
+              <td className="border border-black px-2 py-1.5 leading-snug text-gray-800">
+                <span className="font-semibold uppercase tracking-wide text-gray-500 text-[7px] block mb-0.5">Verification</span>
+                {record.category} Receipt transmitted on <strong className="text-black">{formatDate(submittedAt)}</strong> at{" "}
+                <strong className="text-black">{formatTime(submittedAt)}</strong> for{" "}
+                <strong className="text-black">₹ {formatAmount(net)}/-</strong> from IP{" "}
+                <strong className="text-black">{formatIP(record.submittedIp)}</strong>, verified by{" "}
+                <strong className="text-black">{record.name}</strong> (PAN{" "}
+                <strong className="text-black">{formData.pan || "—"}</strong>) via EVC{" "}
+                <strong className="text-black">{utrn}</strong>, Email / Mobile OTP.
+              </td>
+            </tr>
+          </tbody>
+        </table>
 
         {/* Footer */}
-        <p className="text-center text-xs border-t border-black pt-4">
-          This document has been generated electronically and is valid without a physical signature.
+        <p className="font-sans text-center text-[8px] text-gray-500 border-t border-black pt-2">
+          Generated electronically — valid without a physical signature.
         </p>
       </div>
     </div>
-  );
-}
-
-function Row({ label, value }) {
-  return (
-    <tr>
-      <td className="px-4 py-2 border border-black font-bold w-48">{label}</td>
-      <td className="px-4 py-2 border border-black">{value}</td>
-    </tr>
   );
 }

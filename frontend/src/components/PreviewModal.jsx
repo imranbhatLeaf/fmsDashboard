@@ -23,11 +23,17 @@ export default function PreviewModal({ record, onClose }) {
         className="fixed inset-0 bg-black/50 z-40 transition-opacity print:hidden" 
         onClick={onClose}
       />
-      <div className="fixed inset-y-0 right-0 w-full max-w-md bg-[#FAF9F6] shadow-xl z-50 overflow-y-auto border-l border-gray-200 transform transition-transform">
+      <div className="fixed inset-y-0 right-0 w-full max-w-md bg-[#FAF9F6] shadow-xl z-50 overflow-y-auto border-l border-gray-200 transform transition-transform print:absolute print:inset-0 print:w-full print:max-w-none print:bg-white print:border-none print:shadow-none">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-white sticky top-0">
           <h2 className="text-lg font-bold">Transaction Preview</h2>
           <div className="flex items-center gap-2">
             {/* Req 20: Print official receipt */}
+            <button
+              onClick={() => window.print()}
+              className="text-[10px] font-bold uppercase tracking-wider text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-md transition-colors shadow-sm print:hidden"
+            >
+              Print Preview
+            </button>
             <button
               onClick={() => {
                 if (!record.bankReferenceNo || !record.dateOfTransfer) {
@@ -80,7 +86,7 @@ export default function PreviewModal({ record, onClose }) {
           <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
             <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">Bank Details</h3>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Bank</span><span className="font-medium">{formData.bankName || record.bank_name || record.bankName || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Bank Name</span><span className="font-medium">{formData.bankName || record.bank_name || record.bankName || "—"}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Account No.</span><span className="font-mono">{formData.bankAccountNumber || record.account_number || record.bankAccountNumber || "—"}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">IFSC</span><span className="font-mono">{formData.bankIfsc || record.ifsc_code || record.bankIfsc || "—"}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Beneficiary</span><span>{formData.bankBeneficiaryName || record.beneficiary_name || record.bankBeneficiaryName || "—"}</span></div>
@@ -120,20 +126,28 @@ export default function PreviewModal({ record, onClose }) {
             </div>
           </div>
 
-          {/* Req 20: Full Filled Form Data Preview */}
-          {formDataEntries.length > 0 && (
-            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">Submitted Form Data</h3>
+          {/* Rejection Reason (only shown if rejected) */}
+          {record.rejected && record.rejectionReason && (
+            <div className="bg-red-50 p-4 rounded-lg border border-red-200 shadow-sm">
+              <h3 className="text-xs font-bold uppercase border-b border-red-200 pb-2 mb-3 text-red-700">Rejection Details</h3>
               <div className="space-y-2 text-sm">
-                {formDataEntries.map(([key, value]) => (
-                  <div key={key} className="flex justify-between gap-4">
-                    <span className="text-gray-500 capitalize shrink-0">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                    <span className="text-right break-all">{typeof value === 'object' ? JSON.stringify(value) : String(value || "—")}</span>
-                  </div>
-                ))}
+                <div className="flex justify-between">
+                  <span className="text-red-600">Rejected By</span>
+                  <span className="font-medium capitalize">{record.rejectedBy || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-red-600">Rejected On</span>
+                  <span>{fmtDate(record.rejectedAt)}</span>
+                </div>
+                <div className="mt-2">
+                  <span className="text-red-600 block mb-1">Reason</span>
+                  <span className="font-medium text-gray-800">{record.rejectionReason}</span>
+                </div>
               </div>
             </div>
           )}
+
+
         </div>
       </div>
     </>

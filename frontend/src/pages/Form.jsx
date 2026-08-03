@@ -38,10 +38,9 @@ function PersonalDetails({ data, onChange, showDesignation = true }) {
         <Field label="Address" name="address" value={data.address} onChange={onChange} required disabled />
       </div>
       <Field label="Mobile" name="mobile" value={data.mobile} onChange={onChange} required />
-      <Field label="Email" name="email" value={data.email} onChange={onChange} required disabled />
+      <Field label="Email" name="email" value={data.email} onChange={onChange} required disabled type="email" />
       <Field label="PAN Card" name="pan" value={data.pan} onChange={onChange} required />
       <Field label="Confirm PAN Card" name="panConfirm" value={data.panConfirm} onChange={onChange} required />
-      <Field label="Aadhaar ID" name="aadhaar" value={data.aadhaar} onChange={onChange} />
     </div>
   );
 }
@@ -291,7 +290,6 @@ function ClaimSummary({ meta }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
             <div><strong>Nature of Fellowship:</strong> {meta.programme_nature}</div>
             <div><strong>Fellowship Title:</strong> {meta.programme_title}</div>
-            <div><strong>Fellowship Rate:</strong> ₹ {Number(meta.fellowship_rate || meta.rate).toLocaleString("en-IN")}</div>
             <div className="sm:col-span-2 font-bold text-sm border-t pt-1.5 mt-1.5">
               Total Fellowship: ₹ {Number(meta.fellowship_total || meta.amount).toLocaleString("en-IN")}
             </div>
@@ -371,7 +369,6 @@ export default function FormPage() {
           mobile: data.phone_mobile,
           pan: "",
           panConfirm: "",
-          aadhaar: "",
           bankBeneficiaryName: "",
           bankAccountNumber: "",
           bankAccountNumberConfirm: "",
@@ -405,6 +402,14 @@ export default function FormPage() {
 
     if (formData.pan !== formData.panConfirm) {
       setFormError("PAN Card numbers do not match.");
+      setSubmitting(false);
+      return;
+    }
+
+    // Mobile Number: exactly 10 digits
+    const mobile = formData.mobile?.trim();
+    if (mobile && !/^\d{10}$/.test(mobile)) {
+      setFormError("Mobile Number must be exactly 10 digits (numbers only).");
       setSubmitting(false);
       return;
     }
@@ -544,7 +549,7 @@ export default function FormPage() {
         {/* Instructions */}
         <div className="bg-white border-l-2 border-black px-4 py-2.5 mb-4 text-xs text-gray-700 shadow-sm rounded-r-lg">
           <p className="mb-0.5">• Review the details of your claim below.</p>
-          <p className="mb-0.5">• Provide your bank details and PAN/Aadhaar to process payment.</p>
+          <p className="mb-0.5">• Provide your bank details and PAN to process payment.</p>
           <p>• Fields marked with <span className="text-black font-bold">*</span> are mandatory.</p>
         </div>
 
@@ -556,7 +561,7 @@ export default function FormPage() {
           {/* Personal Details */}
           <div>
             <h2 className="text-xs uppercase tracking-wider text-black font-bold mb-3 pb-1 border-b border-gray-100">
-              Personal Verification & PII
+              Payee Credentials
             </h2>
             <PersonalDetails
               data={formData}

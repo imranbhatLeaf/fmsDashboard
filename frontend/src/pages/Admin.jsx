@@ -103,11 +103,12 @@ export default function AdminDashboard() {
   const [processError, setProcessError] = useState("");
 
   // Admin approve confirmation modal state
-  const [adminApproveModal, setAdminApproveModal] = useState(null); // null | { id, name }
+  const [adminApproveModal, setAdminApproveModal] = useState(null); // null | { id, utrn }
   const [adminApproveSubmitting, setAdminApproveSubmitting] = useState(false);
 
   function openAdminApproveModal(record) {
-    setAdminApproveModal({ id: record._id, name: record.name });
+    const utrn = record.utr_rrn_reference_number || record.utrRrnReferenceNumber || record.token || "—";
+    setAdminApproveModal({ id: record._id, utrn });
     setAdminApproveSubmitting(false);
   }
 
@@ -147,6 +148,11 @@ export default function AdminDashboard() {
   async function handleProcessSubmit() {
     if (!processBankRef.trim()) {
       setProcessError("Bank Reference No is required.");
+      return;
+    }
+    // Bank Reference must be alphanumeric only
+    if (!/^[A-Za-z0-9]+$/.test(processBankRef.trim())) {
+      setProcessError("Bank Reference No must contain only letters and numbers (no spaces or special characters).");
       return;
     }
     if (!processDate) {
@@ -334,7 +340,7 @@ export default function AdminDashboard() {
     if (r.paymentProcessed) return "Paid";
     if (r.registrarApproved) return "Approved by Registrar, Pending for Payment";
     if (r.adminApproved) return "Pending Registrar Approval";
-    if (r.formSubmitted) return "Pending Admin Approval";
+    if (r.formSubmitted) return "Pending Accounts (Admin) Approval";
     return "Form Pending";
   };
 
@@ -352,6 +358,7 @@ export default function AdminDashboard() {
       case "dateOfTransfer": return r.dateOfTransfer ? new Date(r.dateOfTransfer).getTime() : 0;
       case "status": return getRecordStatus(r);
       case "utrn": return r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "";
+      case "bankReferenceNo": return r.bankReferenceNo || "";
       default: return "";
     }
   };
@@ -593,6 +600,7 @@ export default function AdminDashboard() {
                         {renderSortableHeader("Forwarded", "dateOfForwarding")}
                         {renderSortableHeader("Approved", "dateOfApproval")}
                         {renderSortableHeader("UTRN", "utrn")}
+                        {renderSortableHeader("Bank Ref.", "bankReferenceNo")}
                         {renderSortableHeader("Status", "status")}
                         <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100">Actions</th>
                       </tr>
@@ -620,6 +628,7 @@ export default function AdminDashboard() {
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfApproval || r.registrarApprovedAt)}</td>
           
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-500 font-mono text-[11px]">{r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "—"}</td>
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-500 font-mono text-[11px]">{r.bankReferenceNo || "—"}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300">
                             <span
                               className="inline-block text-[11px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
@@ -628,7 +637,7 @@ export default function AdminDashboard() {
                                   ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
                                   : status === "Rejected"
                                   ? { background: "#fef2f2", color: "#dc2626", borderColor: "#fca5a5" }
-                                  : status === "Approved by Registrar, Pending for Payment" || status === "Pending Admin Approval"
+                                  : status === "Approved by Registrar, Pending for Payment" || status === "Pending Accounts (Admin) Approval"
                                   ? { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
                                   : status === "Pending Registrar Approval"
                                   ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
@@ -648,7 +657,7 @@ export default function AdminDashboard() {
   {status === "Pending Registrar Approval" && (r.adminApprovedAt || r.dateOfForwarding) && (
     <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.adminApprovedAt || r.dateOfForwarding)}</div>
   )}
-  {status === "Pending Admin Approval" && r.dateOfUpload && (
+  {status === "Pending Accounts (Admin) Approval" && r.dateOfUpload && (
     <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.dateOfUpload)}</div>
   )}
 </span>
@@ -670,7 +679,7 @@ export default function AdminDashboard() {
                                </button>
                                 )} 
                               
-                              {status === "Pending Admin Approval" && (
+                              {status === "Pending Accounts (Admin) Approval" && (
                                 <>
                                   <button
                                     onClick={() => openAdminApproveModal(r)}
@@ -686,18 +695,13 @@ export default function AdminDashboard() {
                                   </button>
                                 </>
                               )}
-                              {status === "Rejected" && r.rejectionReason && (
-                                <span className="text-[11px] font-semibold text-red-600 block mt-1" title={r.rejectionReason}>
-                                  Reason: {r.rejectionReason}
+                              {status === "Rejected" && (
+                                <span className="text-[11px] font-semibold text-red-600 block mt-1">
+                                  (See Preview for rejection reason)
                                 </span>
                               )}
                               {status === "Pending Registrar Approval" && (
-                                <button
-                                  onClick={() => handleAdminReject(r._id)}
-                                  className="text-[11px] font-bold uppercase tracking-wider text-red-600 px-1.5 py-0.5 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
-                                >
-                                  Reject
-                                </button>
+                                <span className="text-[11px] text-gray-400 italic">Awaiting Registrar</span>
                               )}
                               {status === "Approved by Registrar, Pending for Payment" && (
                                 <>
@@ -941,8 +945,8 @@ export default function AdminDashboard() {
             </div>
             <div className="px-6 py-5">
               <p className="text-sm text-gray-700">
-                Are you sure you want to approve the application for{" "}
-                <span className="font-bold text-black">{adminApproveModal.name}</span>?
+                Are you sure you want to approve UTRN{" "}
+                <span className="font-bold font-mono text-black">{adminApproveModal.utrn}</span>?
               </p>
               <p className="text-xs text-gray-400 mt-2">This action will mark the record as Admin-approved and forward it to the Registrar.</p>
             </div>

@@ -38,7 +38,7 @@ const EXPECTED_HEADERS = [
   "programme_nature", "programme_title", "participation_type", "lecture_type", "honorarium_basis", "num_presences", "rate", "total_amount",
   "journey_from", "journey_to", "journey_mode", "journey_amount", "local_journey_from", "local_journey_to", "local_journey_mode", "local_journey_amount", "grand_total",
   "fellowship_rate", "fellowship_total", "refund_amount_claimed", "payment_receipt_number", "payment_receipt_date", "refund_reason", "academic_year",
-  "payee_status", "payee_link_token", "pan_number", "aadhaar_number", "beneficiary_name", "account_number", "bank_name", "ifsc_code", "bank_branch_address"
+  "payee_status", "payee_link_token", "pan_number", "beneficiary_name", "account_number", "bank_name", "ifsc_code", "bank_branch_address"
 ];
 
 function isValidEmail(email) {
@@ -67,14 +67,27 @@ function validateRow(row, rowNum) {
   if (!row.name?.trim()) return { isValid: false, reason: "Missing name" };
   if (!row.designation?.trim()) return { isValid: false, reason: "Missing designation" };
   if (!row.address?.trim()) return { isValid: false, reason: "Missing address" };
-  if (!row.phone_mobile?.trim()) return { isValid: false, reason: "Missing phone_mobile" };
+  if (!row.phone_mobile?.trim()) {
+    return { isValid: false, reason: "Missing phone_mobile" };
+  } else if (!/^\d{10}$/.test(row.phone_mobile.trim())) {
+    return { isValid: false, reason: `Mobile Number must be exactly 10 digits: "${row.phone_mobile}"` };
+  }
   if (!row.email?.trim() || !isValidEmail(row.email.trim())) {
     return { isValid: false, reason: `Invalid email: "${row.email}"` };
   }
 
+  // Name & Designation must not contain numbers or special characters
+  const NAME_FORMAT_REGEX = /^[A-Za-z .'\-]+$/;
+  if (!NAME_FORMAT_REGEX.test(row.name.trim())) {
+    return { isValid: false, reason: `Name must contain only letters (no numbers or special characters): "${row.name}"` };
+  }
+  if (!NAME_FORMAT_REGEX.test(row.designation.trim())) {
+    return { isValid: false, reason: `Designation must contain only letters (no numbers or special characters): "${row.designation}"` };
+  }
+
   // Payee prefilled checks (§6)
   const payeePrefilledFields = [
-    "pan_number", "aadhaar_number", "beneficiary_name", 
+    "pan_number", "beneficiary_name", 
     "account_number", "bank_name", "ifsc_code", "bank_branch_address",
     "payee_link_token"
   ];

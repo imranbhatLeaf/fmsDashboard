@@ -23,7 +23,6 @@ const REFUND_FIELDS_SPEC = {
   applicantInfo: [
     { label: "Applicant Name", name: "applicant_name", required: true, type: "text" },
     { label: "Address", name: "address", required: true, type: "text" },
-    { label: "Mobile Number", name: "mobile_number", required: true, type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
   ],
   refundDetails: [
@@ -52,8 +51,8 @@ const REFUND_FIELDS_SPEC = {
 };
 
 const FELLOWSHIP_FIELDS_SPEC = {
-  claimantInfo: [
-    { label: "Claimant Name", name: "name", required: true, type: "text" },
+  payeeInfo: [
+    { label: "Payee Name", name: "name", required: true, type: "text" },
     { label: "Designation", name: "designation", required: true, type: "text" },
     { label: "Address", name: "address", required: true, type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
@@ -61,9 +60,7 @@ const FELLOWSHIP_FIELDS_SPEC = {
   programmeDetails: [
     { label: "Nature of Programme", name: "nature_of_programme", required: true, type: "text" },
     { label: "Title of Programme", name: "title_of_programme", required: true, type: "text" },
-    { label: "Fellowship as per Norms", name: "fellowship_as_per_norms", required: true, type: "text" },
-    { label: "Rate (₹)", name: "rate", required: true, type: "number" },
-    { label: "Total (₹)", name: "total", required: true, type: "number" },
+    { label: "Fellowship Amount (₹)", name: "total", required: true, type: "number" },
   ],
   officeUse: [
     { label: "Entitled Amount (₹)", name: "entitled_amount", type: "number" },
@@ -73,7 +70,7 @@ const FELLOWSHIP_FIELDS_SPEC = {
     { label: "Certified By (Prog. Coordinator)", name: "participation_payment_certified_by", type: "text" },
     { label: "Received Amount (₹)", name: "received_amount", type: "number" },
     { label: "Received Amount in Words", name: "received_amount_words", type: "text" },
-    { label: "Claimant Signature/Status", name: "claimant_signature", type: "text" },
+    { label: "Payee Signature/Status", name: "claimant_signature", type: "text" },
     { label: "Passed for Payment Amount (₹)", name: "passed_for_payment_amount", type: "number" },
     { label: "Passed for Payment Amount in Words", name: "passed_for_payment_amount_words", type: "text" },
     { label: "UTR/RRN Reference Number", name: "utr_rrn_reference_number", type: "text" },
@@ -82,12 +79,30 @@ const FELLOWSHIP_FIELDS_SPEC = {
   ]
 };
 
-const TADA_FIELDS_SPEC = {
-  claimantInfo: [
-    { label: "Claimant Name", name: "name", required: true, type: "text" },
+const SALARY_FIELDS_SPEC = {
+  payeeInfo: [
+    { label: "Payee Name", name: "name", required: true, type: "text" },
     { label: "Designation", name: "designation", required: true, type: "text" },
     { label: "Address", name: "address", required: true, type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
+  ],
+  salaryDetails: [
+    { label: "Nature of Programme", name: "nature_of_programme", required: true, type: "text" },
+    { label: "Title of Programme", name: "title_of_programme", required: true, type: "text" },
+    { label: "Salary Amount (₹)", name: "total", required: true, type: "number" },
+  ],
+};
+
+const TADA_FIELDS_SPEC = {
+  payeeInfo: [
+    { label: "Payee Name", name: "name", required: true, type: "text" },
+    { label: "Designation", name: "designation", required: true, type: "text" },
+    { label: "Address", name: "address", required: true, type: "text" },
+    { label: "Email", name: "email", required: true, type: "email" },
+  ],
+  programmeDetails: [
+    { label: "Nature of Programme", name: "nature_of_programme", required: true, type: "text" },
+    { label: "Title of Programme", name: "title_of_programme", required: true, type: "text" }
   ],
   officeUse: [
     { label: "Entitled Amount (₹)", name: "entitled_amount", type: "number" },
@@ -97,7 +112,7 @@ const TADA_FIELDS_SPEC = {
     { label: "Certified By (Prog. Coordinator)", name: "participation_payment_certified_by", type: "text" },
     { label: "Received Amount (₹)", name: "received_amount", type: "number" },
     { label: "Received Amount in Words", name: "received_amount_words", type: "text" },
-    { label: "Claimant Signature/Status", name: "claimant_signature", type: "text" },
+    { label: "Payee Signature/Status", name: "claimant_signature", type: "text" },
     { label: "Passed for Payment Amount (₹)", name: "passed_for_payment_amount", type: "number" },
     { label: "Passed for Payment Amount in Words", name: "passed_for_payment_amount_words", type: "text" },
     { label: "UTR/RRN Reference Number", name: "utr_rrn_reference_number", type: "text" },
@@ -107,8 +122,8 @@ const TADA_FIELDS_SPEC = {
 };
 
 const HONORARIUM_FIELDS_SPEC = {
-  claimantInfo: [
-    { label: "Claimant Name", name: "name", required: true, type: "text" },
+  payeeInfo: [
+    { label: "Payee Name", name: "name", required: true, type: "text" },
     { label: "Designation", name: "designation", required: true, type: "text" },
     { label: "Address", name: "address", required: true, type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
@@ -133,7 +148,7 @@ const HONORARIUM_FIELDS_SPEC = {
     { label: "Certified By (Prog. Coordinator)", name: "participation_payment_certified_by", type: "text" },
     { label: "Received Amount (₹)", name: "received_amount", type: "number" },
     { label: "Received Amount in Words", name: "received_amount_words", type: "text" },
-    { label: "Claimant Signature/Status", name: "claimant_signature", type: "text" },
+    { label: "Payee Signature/Status", name: "claimant_signature", type: "text" },
     { label: "Passed for Payment Amount (₹)", name: "passed_for_payment_amount", type: "number" },
     { label: "Passed for Payment Amount in Words", name: "passed_for_payment_amount_words", type: "text" },
     { label: "UTR/RRN Reference Number", name: "utr_rrn_reference_number", type: "text" },
@@ -211,7 +226,48 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
     setError(null);
     try {
       let dataToSave = { ...formData };
-      
+
+      // ── Validation ──────────────────────────────────────────────
+      // Name & Designation: letters, spaces, dots, hyphens only (no numbers or special chars)
+      const NAME_REGEX = /^[A-Za-z .\-']+$/;
+      const nameVal = (dataToSave.name || dataToSave.applicant_name || "").trim();
+      if (nameVal && !NAME_REGEX.test(nameVal)) {
+        setError("Name must contain only letters (no numbers or special characters).");
+        setSaving(false);
+        return;
+      }
+      const desigVal = (dataToSave.designation || "").trim();
+      if (desigVal && desigVal !== "N/A" && !NAME_REGEX.test(desigVal)) {
+        setError("Designation must contain only letters (no numbers or special characters).");
+        setSaving(false);
+        return;
+      }
+
+      // Mobile number: exactly 10 digits
+      const mobileVal = (dataToSave.phone_mobile || dataToSave.mobile_number || "").trim();
+      if (mobileVal && mobileVal !== "N/A" && !/^\d{10}$/.test(mobileVal)) {
+        setError("Mobile Number must be exactly 10 digits (numbers only).");
+        setSaving(false);
+        return;
+      }
+
+      // Nature of Programme & Title (min 4 chars) — for all non-refund forms
+      if (selectedFormType !== 'refund') {
+        const natureVal = (dataToSave.nature_of_programme || dataToSave.programme_nature || "").trim();
+        if (natureVal && natureVal.length < 4) {
+          setError("Nature of Programme must be at least 4 characters.");
+          setSaving(false);
+          return;
+        }
+        const titleVal = (dataToSave.title_of_programme || dataToSave.programme_title || "").trim();
+        if (titleVal && titleVal.length < 4) {
+          setError("Title of Programme must be at least 4 characters.");
+          setSaving(false);
+          return;
+        }
+      }
+      // ────────────────────────────────────────────────────────────
+
       // Auto-set the backend services field to keep it in sync with component
       dataToSave.services = dataToSave.component;
 
@@ -240,10 +296,8 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
         dataToSave.phone_mobile = formData.telephone_mobile || formData.phone_mobile;
         dataToSave.programme_nature = formData.nature_of_programme || formData.programme_nature;
         dataToSave.programme_title = formData.title_of_programme || formData.programme_title;
-        dataToSave.rate = Number(formData.rate || 0);
         dataToSave.total_amount = Number(formData.total || 0);
         dataToSave.amount = Number(formData.passed_for_payment_amount || formData.total || formData.amount || 0);
-        dataToSave.fellowship_as_per_norms = formData.fellowship_as_per_norms;
         dataToSave.claimant_signature = formData.claimant_signature;
       } else if (selectedFormType === 'tada') {
         dataToSave.form_type = 'tada';
@@ -266,21 +320,8 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
         dataToSave.address = formData.address;
         dataToSave.programme_nature = formData.nature_of_programme || formData.programme_nature;
         dataToSave.programme_title = formData.title_of_programme || formData.programme_title;
-        dataToSave.rate = Number(formData.rate || 0);
         dataToSave.total_amount = Number(formData.total || 0);
-        dataToSave.amount = Number(formData.passed_for_payment_amount || formData.total || formData.amount || 0);
-      } else if (selectedFormType === 'salary') {
-        dataToSave.form_type = 'salary';
-        dataToSave.category = 'Salary';
-        dataToSave.name = formData.name;
-        dataToSave.email = formData.email;
-        dataToSave.designation = formData.designation;
-        dataToSave.address = formData.address;
-        dataToSave.programme_nature = formData.nature_of_programme || formData.programme_nature;
-        dataToSave.programme_title = formData.title_of_programme || formData.programme_title;
-        dataToSave.rate = Number(formData.rate || 0);
-        dataToSave.total_amount = Number(formData.total || 0);
-        dataToSave.amount = Number(formData.passed_for_payment_amount || formData.total || formData.amount || 0);
+        dataToSave.amount = Number(formData.total || formData.amount || 0);
       } else if (selectedFormType === 'honorarium') {
         dataToSave.form_type = 'honorarium';
         dataToSave.category = 'Honorarium';
@@ -506,8 +547,8 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                 ) : selectedFormType === 'salary' ? (
                   <>
                     <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Claimant Info</h3>
-                      {FELLOWSHIP_FIELDS_SPEC.claimantInfo.map(field => {
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Payee Info</h3>
+                      {SALARY_FIELDS_SPEC.payeeInfo.map(field => {
                         const val = formData[field.name];
                         if (!val) return null;
                         return (
@@ -520,7 +561,7 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                     </div>
                     <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
                       <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Salary Details</h3>
-                      {FELLOWSHIP_FIELDS_SPEC.programmeDetails.map(field => {
+                      {SALARY_FIELDS_SPEC.salaryDetails.map(field => {
                         let val = formData[field.name] || formData[field.name === 'nature_of_programme' ? 'programme_nature' : field.name === 'title_of_programme' ? 'programme_title' : field.name === 'total' ? 'total_amount' : ''];
                         if (!val) return null;
                         return (
@@ -535,9 +576,9 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                 ) : selectedFormType === 'fellowship' ? (
                   <>
                     <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Claimant Info</h3>
-                      {FELLOWSHIP_FIELDS_SPEC.claimantInfo.map(field => {
-                        const val = formData[field.name] || formData[field.name === 'telephone_office' ? 'phone_office' : field.name === 'telephone_mobile' ? 'phone_mobile' : ''];
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Payee Info</h3>
+                      {FELLOWSHIP_FIELDS_SPEC.payeeInfo.map(field => {
+                        const val = formData[field.name];
                         if (!val) return null;
                         return (
                           <div key={field.name} className="flex justify-between text-sm">
@@ -565,9 +606,23 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                 ) : selectedFormType === 'tada' ? (
                   <>
                     <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Claimant Info</h3>
-                      {TADA_FIELDS_SPEC.claimantInfo.map(field => {
-                        const val = formData[field.name] || formData[field.name === 'telephone_office' ? 'phone_office' : field.name === 'telephone_mobile' ? 'phone_mobile' : ''];
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Payee Info</h3>
+                      {TADA_FIELDS_SPEC.payeeInfo.map(field => {
+                        const val = formData[field.name];
+                        if (!val) return null;
+                        return (
+                          <div key={field.name} className="flex justify-between text-sm">
+                            <span className="text-gray-500 font-medium">{field.label}:</span>
+                            <span className="font-semibold text-gray-800">{val}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Programme Details</h3>
+                      {TADA_FIELDS_SPEC.programmeDetails.map(field => {
+                        const val = formData[field.name];
                         if (!val) return null;
                         return (
                           <div key={field.name} className="flex justify-between text-sm">
@@ -605,9 +660,9 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                 ) : selectedFormType === 'honorarium' ? (
                   <>
                     <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Claimant Info</h3>
-                      {HONORARIUM_FIELDS_SPEC.claimantInfo.map(field => {
-                        const val = formData[field.name] || formData[field.name === 'telephone_office' ? 'phone_office' : field.name === 'telephone_mobile' ? 'phone_mobile' : ''];
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2">Payee Info</h3>
+                      {HONORARIUM_FIELDS_SPEC.payeeInfo.map(field => {
+                        const val = formData[field.name];
                         if (!val) return null;
                         return (
                           <div key={field.name} className="flex justify-between text-sm">
@@ -670,24 +725,24 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                 ) : selectedFormType === 'salary' ? (
                   <>
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
-                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Claimant Info</h3>
+                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Payee Info</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {FELLOWSHIP_FIELDS_SPEC.claimantInfo.map(renderInputField)}
+                        {SALARY_FIELDS_SPEC.payeeInfo.map(renderInputField)}
                       </div>
                     </div>
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
                       <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Salary Details</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {FELLOWSHIP_FIELDS_SPEC.programmeDetails.map(renderInputField)}
+                        {SALARY_FIELDS_SPEC.salaryDetails.map(renderInputField)}
                       </div>
                     </div>
                   </>
                 ) : selectedFormType === 'fellowship' ? (
                   <>
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
-                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Claimant Info</h3>
+                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Payee Info</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {FELLOWSHIP_FIELDS_SPEC.claimantInfo.map(renderInputField)}
+                        {FELLOWSHIP_FIELDS_SPEC.payeeInfo.map(renderInputField)}
                       </div>
                     </div>
 
@@ -702,9 +757,16 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                 ) : selectedFormType === 'tada' ? (
                   <>
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
-                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Claimant Info</h3>
+                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Payee Info</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {TADA_FIELDS_SPEC.claimantInfo.map(renderInputField)}
+                        {TADA_FIELDS_SPEC.payeeInfo.map(renderInputField)}
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Programme Details</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {TADA_FIELDS_SPEC.programmeDetails.map(renderInputField)}
                       </div>
                     </div>
 
@@ -755,15 +817,15 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                         <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end border-b pb-3 mb-3">
                           <div className="md:col-span-1 flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500">From *</label>
-                            <input type="text" value={row.local_journey_from} onChange={(e) => handleJourneyChange(index, 'local_journey_from', e.target.value)} required className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
+                            <input type="text" value={row.local_journey_from} onChange={(e) => handleLocalJourneyChange(index, 'local_journey_from', e.target.value)} required className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
                           </div>
                           <div className="md:col-span-1 flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500">To *</label>
-                            <input type="text" value={row.local_journey_to} onChange={(e) => handleJourneyChange(index, 'local_journey_to', e.target.value)} required className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
+                            <input type="text" value={row.local_journey_to} onChange={(e) => handleLocalJourneyChange(index, 'local_journey_to', e.target.value)} required className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
                           </div>
                           <div className="md:col-span-1 flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500">Mode *</label>
-                            <select value={row.local_journey_mode} onChange={(e) => handleJourneyChange(index, 'local_journey_mode', e.target.value)} required className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black">
+                            <select value={row.local_journey_mode} onChange={(e) => handleLocalJourneyChange(index, 'local_journey_mode', e.target.value)} required className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black">
                               <option value="Bus">Bus</option>
                               <option value="Taxi">Taxi</option>
                               <option value="Car">Car</option>
@@ -771,7 +833,7 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                           </div>
                           <div className="md:col-span-1 flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500">Amount (₹) *</label>
-                            <input type="number" value={row.local_journey_amount} onChange={(e) => handleJourneyChange(index, 'local_journey_amount', e.target.value)} required className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
+                            <input type="number" value={row.local_journey_amount} onChange={(e) => handleLocalJourneyChange(index, 'local_journey_amount', e.target.value)} required className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
                           </div>
                           <div className="md:col-span-1">
                             {localJourneyRows.length > 1 && (
@@ -796,9 +858,9 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                 ) : selectedFormType === 'honorarium' ? (
                   <>
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
-                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Claimant Info</h3>
+                      <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-2">Payee Info</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {HONORARIUM_FIELDS_SPEC.claimantInfo.map(renderInputField)}
+                        {HONORARIUM_FIELDS_SPEC.payeeInfo.map(renderInputField)}
                       </div>
                     </div>
 

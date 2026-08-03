@@ -213,7 +213,7 @@ function getHtmlBody(doc, subject, stage = 1) {
 <body style="font-family: Tahoma, Arial, sans-serif; background-color: #FAF9F6; margin: 0; padding: 20px; color: #333333;">
   <div style="max-width: 650px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
     <div style="background-color: #ffffff; padding: 20px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-      <img src="https://finance.asssr.org/header.png" alt="Asiatic Society for Social Science Research Logo" style="max-height: 80px; max-width: 100%; height: auto;" />
+      <h2 style="margin: 0; color: #1e3a8a; font-size: 20px; font-weight: bold;">Asiatic Society for Social Science Research</h2>
     </div>
     <div style="padding: 15px 24px 0 24px; font-size: 11px; color: #b91c1c; font-family: monospace;">
       [Please do not reply to this mail as this is an automated mail service.]

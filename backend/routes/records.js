@@ -36,7 +36,6 @@ router.get("/", requireAuth, async (req, res) => {
 
     for (const record of expiredRecords) {
       record.pan_number = "N/A";
-      record.aadhaar_number = "N/A";
       record.beneficiary_name = "N/A";
       record.account_number = "N/A";
       record.bank_name = "N/A";
@@ -73,7 +72,6 @@ router.get("/", requireAuth, async (req, res) => {
       record.formData = {
         pan: "N/A",
         panConfirm: "N/A",
-        aadhaar: "N/A",
         bankBeneficiaryName: "N/A",
         bankAccountNumber: "N/A",
         bankAccountNumberConfirm: "N/A",
@@ -114,6 +112,22 @@ router.post("/", requireAuth, requireRole(["admin"]), async (req, res) => {
         data[key] = data[key].trim();
         if (data[key] === "") data[key] = null;
       }
+    }
+
+    // Name & Designation must not contain numbers or special characters
+    const NAME_FORMAT_REGEX = /^[A-Za-z .'\\-]+$/;
+    const nameToCheck = data.name || data.applicant_name;
+    if (nameToCheck && !NAME_FORMAT_REGEX.test(nameToCheck)) {
+      return res.status(400).json({ message: "Name must contain only letters (no numbers or special characters)." });
+    }
+    if (data.designation && data.designation !== "N/A" && !NAME_FORMAT_REGEX.test(data.designation)) {
+      return res.status(400).json({ message: "Designation must contain only letters (no numbers or special characters)." });
+    }
+
+    // Mobile Number: exactly 10 digits
+    const mobileToCheck = data.phone_mobile || data.mobile_number;
+    if (mobileToCheck && mobileToCheck !== "N/A" && !/^\d{10}$/.test(mobileToCheck)) {
+      return res.status(400).json({ message: "Mobile Number must be exactly 10 digits (numbers only)." });
     }
 
     // Normalize enum fields
@@ -511,6 +525,19 @@ router.put("/:id/edit", requireAuth, requireRole(["admin"]), async (req, res) =>
       services: () => "ASSSR",
       category: () => "Honorarium"
     };
+
+    const NAME_FORMAT_REGEX = /^[A-Za-z .'\\-]+$/;
+    const nameToCheck = updates.name || updates.applicant_name;
+    if (nameToCheck && !NAME_FORMAT_REGEX.test(nameToCheck)) {
+      return res.status(400).json({ message: "Name must contain only letters (no numbers or special characters)." });
+    }
+    if (updates.designation && updates.designation !== "N/A" && !NAME_FORMAT_REGEX.test(updates.designation)) {
+      return res.status(400).json({ message: "Designation must contain only letters (no numbers or special characters)." });
+    }
+    const mobileToCheck = updates.phone_mobile || updates.mobile_number || updates.telephone_mobile;
+    if (mobileToCheck && mobileToCheck !== "N/A" && !/^\d{10}$/.test(mobileToCheck)) {
+      return res.status(400).json({ message: "Mobile Number must be exactly 10 digits (numbers only)." });
+    }
 
     for (const field of allowedFields) {
       if (updates[field] !== undefined) {

@@ -80,7 +80,6 @@ const recordSchema = new mongoose.Schema(
 
     // Payee submitted details (PII)
     pan_number: { type: String, default: null },
-    aadhaar_number: { type: String, default: null },
     beneficiary_name: { type: String, default: null },
     account_number: { type: String, default: null },
     bank_name: { type: String, default: null },

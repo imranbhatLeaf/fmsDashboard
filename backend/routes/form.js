@@ -89,7 +89,6 @@ router.get("/receipt/:token", rateLimiter, async (req, res) => {
       record.formData = {
         pan: "N/A",
         panConfirm: "N/A",
-        aadhaar: "N/A",
         bankBeneficiaryName: "N/A",
         bankAccountNumber: "N/A",
         bankAccountNumberConfirm: "N/A",
@@ -107,10 +106,8 @@ router.get("/receipt/:token", rateLimiter, async (req, res) => {
     }
 
     // Audit log read of PII
-    if (record.pan_number || record.aadhaar_number) {
-      const fieldsAccessing = [];
-      if (record.pan_number) fieldsAccessing.push("pan_number");
-      if (record.aadhaar_number) fieldsAccessing.push("aadhaar_number");
+    if (record.pan_number) {
+      const fieldsAccessing = ["pan_number"];
       
       await AuditLog.create({
         action: "READ_PII",
@@ -173,7 +170,6 @@ router.get("/:token", rateLimiter, async (req, res) => {
       record.formData = {
         pan: "N/A",
         panConfirm: "N/A",
-        aadhaar: "N/A",
         bankBeneficiaryName: "N/A",
         bankAccountNumber: "N/A",
         bankAccountNumberConfirm: "N/A",
@@ -194,11 +190,13 @@ router.get("/:token", rateLimiter, async (req, res) => {
     if (record.rejected) {
       approvalStatus = "Rejected" + (record.rejectionReason ? ": " + record.rejectionReason : "");
     } else if (record.paymentProcessed) {
-      approvalStatus = "Payment Processed (Completed)";
+      const pDate = record.dateOfTransfer ? new Date(record.dateOfTransfer).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN');
+      const pRef = record.bankReferenceNo || record.utr_rrn_reference_number || "N/A";
+      approvalStatus = `Payment Processed (Completed) Payment proceeded dated ${pDate} via Bank Reference Number ${pRef}.`;
     } else if (record.registrarApproved) {
       approvalStatus = "Approved by Registrar, Pending for Payment";
     } else if (record.adminApproved) {
-      approvalStatus = "Approved by Admin, Pending Registrar Approval";
+      approvalStatus = "Approved by Accounts (Admin), Pending Registrar Approval";
     }
 
     res.json({
@@ -256,14 +254,12 @@ router.post("/:token", rateLimiter, async (req, res) => {
       return res.status(404).json({ message: "Invalid or expired link." });
     }
 
-    const { pan, aadhaar, bankBeneficiaryName, bankAccountNumber, bankName, bankIfsc, bankBranchAddress } = req.body;
+    const { pan, bankBeneficiaryName, bankAccountNumber, bankName, bankIfsc, bankBranchAddress } = req.body;
 
     // Validate only editable fields are provided/validated
     if (!pan || !pan.trim()) {
       return res.status(400).json({ message: "PAN Card is required." });
     }
-
-    // Aadhaar is optional; no pattern validation is enforced if provided
 
     if (!bankBeneficiaryName || !bankBeneficiaryName.trim()) {
       return res.status(400).json({ message: "Beneficiary name is required." });
@@ -305,7 +301,6 @@ router.post("/:token", rateLimiter, async (req, res) => {
 
     // Populate data
     record.pan_number = pan.trim().toUpperCase();
-    record.aadhaar_number = aadhaar ? aadhaar.trim() : null;
     record.beneficiary_name = bankBeneficiaryName.trim();
     record.account_number = bankAccountNumber.trim();
     record.bank_name = bankName.trim();
@@ -316,7 +311,6 @@ router.post("/:token", rateLimiter, async (req, res) => {
     record.formData = {
       ...req.body,
       pan: record.pan_number,
-      aadhaar: record.aadhaar_number,
       bankBeneficiaryName: record.beneficiary_name,
       bankAccountNumber: record.account_number,
       bankName: record.bank_name,
@@ -334,7 +328,7 @@ router.post("/:token", rateLimiter, async (req, res) => {
     await AuditLog.create({
       action: "WRITE_PII",
       recordId: record._id,
-      fieldsAccessing: ["pan_number", "aadhaar_number"],
+      fieldsAccessing: ["pan_number"],
       accessedBy: "payee",
       ipAddress: record.submittedIp
     });
