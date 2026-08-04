@@ -190,9 +190,9 @@ router.get("/:token", rateLimiter, async (req, res) => {
     if (record.rejected) {
       approvalStatus = "Rejected" + (record.rejectionReason ? ": " + record.rejectionReason : "");
     } else if (record.paymentProcessed) {
-      const pDate = record.dateOfTransfer ? new Date(record.dateOfTransfer).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN');
+      const pDate = record.dateOfTransfer ? new Date(record.dateOfTransfer).toLocaleDateString('en-IN') : (record.paymentProcessedAt ? new Date(record.paymentProcessedAt).toLocaleDateString('en-IN') : '—');
       const pRef = record.bankReferenceNo || record.utr_rrn_reference_number || "N/A";
-      approvalStatus = `Payment Processed (Completed) Payment proceeded dated ${pDate} via Bank Reference Number ${pRef}.`;
+      approvalStatus = `Payment Processed ${pDate} via Bank Reference Number ${pRef}.`;
     } else if (record.registrarApproved) {
       approvalStatus = "Approved by Registrar, Pending for Payment";
     } else if (record.adminApproved) {
@@ -259,6 +259,11 @@ router.post("/:token", rateLimiter, async (req, res) => {
     // Validate only editable fields are provided/validated
     if (!pan || !pan.trim()) {
       return res.status(400).json({ message: "PAN Card is required." });
+    }
+
+    const PAN_REGEX = /^[A-Za-z]{6}[0-9]{4}$/;
+    if (!PAN_REGEX.test(pan.trim())) {
+      return res.status(400).json({ message: "PAN Card must be 6 letters followed by 4 numbers." });
     }
 
     if (!bankBeneficiaryName || !bankBeneficiaryName.trim()) {

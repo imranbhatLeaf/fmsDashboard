@@ -400,6 +400,13 @@ export default function FormPage() {
     const pan = formData.pan?.trim();
     const ifsc = formData.bankIfsc?.trim();
 
+  const PAN_REGEX = /^[A-Za-z]{6}[0-9]{4}$/;
+    if (!pan || !PAN_REGEX.test(pan)) {
+      setFormError("PAN Card must be 6 letters followed by 4 numbers.");
+      setSubmitting(false);
+      return;
+    }
+
     if (formData.pan !== formData.panConfirm) {
       setFormError("PAN Card numbers do not match.");
       setSubmitting(false);
@@ -578,14 +585,7 @@ export default function FormPage() {
             <BankDetails data={formData} onChange={handleChange} />
           </div>
              {/* TA/DA Fields */}
-          {(meta.form_type === "tada" || meta.category === "TA/DA") && (
-            <div>
-              <h2 className="text-xs uppercase tracking-wider text-black font-bold mb-3 pb-1 border-b border-gray-100">
-                Travel & Journey Details
-              </h2>
-              <TadaFields data={formData} onChange={handleChange} />
-            </div>
-          )}
+         
 
           {formError && (
             <p className="text-red-600 text-sm border-l-4 border-red-600 p-3 bg-red-50">{formError}</p>

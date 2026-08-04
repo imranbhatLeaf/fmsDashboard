@@ -1,5 +1,22 @@
 const nodemailer = require("nodemailer");
 
+const SERVICE_NAMES = {
+  ASSSR: "Asiatic Society for Social Science Research",
+  VMI: "Varāhamihira Multidisciplinary Institute",
+  DHC: "Deccan History Congress",
+  JASSSR: "Journal of Asiatic Society for Social Science Research",
+};
+
+function getOrgName(doc) {
+  return SERVICE_NAMES[doc.services] || SERVICE_NAMES[doc.component] || doc.services || "ASSSR";
+}
+
+
+
+
+
+
+
 function getSubject(doc, stage = 1) {
   const paymentType = doc.category;
   if (stage === 1) {
@@ -93,7 +110,7 @@ ${content}
 
 With kind regards,
 O/o Finance
-On behalf of Asiatic Society for Social Science Research and its Components
+On behalf of ${getOrgName(doc)} and its Components
 
 Print this mail only if absolutely necessary. Save Paper!! Save Trees!!
 ====================================================
@@ -213,7 +230,7 @@ function getHtmlBody(doc, subject, stage = 1) {
 <body style="font-family: Tahoma, Arial, sans-serif; background-color: #FAF9F6; margin: 0; padding: 20px; color: #333333;">
   <div style="max-width: 650px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
     <div style="background-color: #ffffff; padding: 20px; text-align: center; border-bottom: 1px solid #e5e7eb;">
-      <h2 style="margin: 0; color: #1e3a8a; font-size: 20px; font-weight: bold;">Asiatic Society for Social Science Research</h2>
+      <h2 style="margin: 0; color: #1e3a8a; font-size: 20px; font-weight: bold;">${getOrgName(doc)}</h2>
     </div>
     <div style="padding: 15px 24px 0 24px; font-size: 11px; color: #b91c1c; font-family: monospace;">
       [Please do not reply to this mail as this is an automated mail service.]
@@ -230,7 +247,7 @@ function getHtmlBody(doc, subject, stage = 1) {
       <div style="margin-top: 24px; font-size: 14px; line-height: 1.6; color: #374151;">
         With kind regards,<br/>
         <strong>O/o Finance</strong><br/>
-        On behalf of Asiatic Society for Social Science Research and its Components
+        On behalf of ${getOrgName(doc)} and its Components
       </div>
       
       <p style="font-size: 11px; color: #16a34a; font-weight: bold; margin-top: 24px;">

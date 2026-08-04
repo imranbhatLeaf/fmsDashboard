@@ -328,9 +328,9 @@ router.post("/", requireAuth, requireRole(["admin"]), upload.single("file"), asy
       createdAt: { $gte: new Date(year, 0, 1), $lt: new Date(year + 1, 0, 1) }
     });
     for (let i = 0; i < validDocs.length; i++) {
-      const doc = validDocs[i];
       const comp = (doc.component || "ASSSR").toUpperCase();
-      const shortPrefix = comp.substring(0, 3);
+      const prefixMap = { ASSSR: "ASR", VMI: "VMI", DHC: "DHC", JASSSR: "JAS" };
+      const shortPrefix = prefixMap[comp] || comp.substring(0, 3);
       const seq = String(baseCount + i + 1).padStart(3, "0");
       const utrn = `${shortPrefix}${year}${seq}`;
       doc.payee_link_token = utrn;

@@ -62,7 +62,7 @@ router.get("/", requireAuth, async (req, res) => {
       }
 
       if (!record.receiptNumber) {
-        const prefix = { ASSSR: "A", VMI: "V", DHC: "D", JASSSR: "J" }[record.services] || "X";
+        const prefix = { ASSSR: "ASR", VMI: "VMI", DHC: "DHC", JASSSR: "JAS" }[record.services] || "X";
         const year = new Date().getFullYear();
         const count = await Record.countDocuments({ paymentProcessed: true });
         const seq = String(count + 1).padStart(4, "0");

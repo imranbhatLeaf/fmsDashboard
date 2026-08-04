@@ -21,7 +21,7 @@ const CSV_FIELDS = [
 
 const REFUND_FIELDS_SPEC = {
   applicantInfo: [
-    { label: "Applicant Name", name: "applicant_name", required: true, type: "text" },
+    { label: "Payee", name: "applicant_name", required: true, type: "text" },
     { label: "Address", name: "address", required: true, type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
   ],
@@ -52,7 +52,7 @@ const REFUND_FIELDS_SPEC = {
 
 const FELLOWSHIP_FIELDS_SPEC = {
   payeeInfo: [
-    { label: "Payee Name", name: "name", required: true, type: "text" },
+    { label: "Payee", name: "name", required: true, type: "text" },
     { label: "Designation", name: "designation", required: true, type: "text" },
     { label: "Address", name: "address", required: true, type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
@@ -81,7 +81,7 @@ const FELLOWSHIP_FIELDS_SPEC = {
 
 const SALARY_FIELDS_SPEC = {
   payeeInfo: [
-    { label: "Payee Name", name: "name", required: true, type: "text" },
+    { label: "Payee", name: "name", required: true, type: "text" },
     { label: "Designation", name: "designation", required: true, type: "text" },
     { label: "Address", name: "address", required: true, type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
@@ -95,7 +95,7 @@ const SALARY_FIELDS_SPEC = {
 
 const TADA_FIELDS_SPEC = {
   payeeInfo: [
-    { label: "Payee Name", name: "name", required: true, type: "text" },
+    { label: "Payee", name: "name", required: true, type: "text" },
     { label: "Designation", name: "designation", required: true, type: "text" },
     { label: "Address", name: "address", required: true, type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
@@ -123,8 +123,9 @@ const TADA_FIELDS_SPEC = {
 
 const HONORARIUM_FIELDS_SPEC = {
   payeeInfo: [
-    { label: "Payee Name", name: "name", required: true, type: "text" },
+    { label: "Payee", name: "name", required: true, type: "text" },
     { label: "Designation", name: "designation", required: true, type: "text" },
+    { label: "Pay Level", name: "pay_level", required: true, type: "select", options: ["Level 11", "Level 10", "Level 8 & 9", "Level 7", "Level 6", "Level 4 & 5", "Level 2 & 3"] },
     { label: "Address", name: "address", required: true, type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
   ],
@@ -571,10 +572,10 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                   className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black animate-fadeIn"
                 >
                   <option value="salary">Salary Form</option>
-                  <option value="refund">Refund Form</option>
+                   <option value="honorarium">Honorarium Bill Form</option>
                   <option value="fellowship">Fellowship Bill Form</option>
                   <option value="tada">Travelling & TA/DA Form</option>
-                  <option value="honorarium">Honorarium Bill Form</option>
+                  <option value="refund">Refund Form</option>
                 </select>
               </div>
             )}
@@ -587,6 +588,10 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
               </div>
             ) : (
               <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">UTRN</span>
+                  <span className="text-sm font-semibold">{formData.utr_rrn_reference_number || formData.utrRrnReferenceNumber || "N/A"}</span>
+                </div>
                 <div>
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Component</span>
                   <span className="text-sm font-semibold">{formData.component || formData.services || "N/A"}</span>

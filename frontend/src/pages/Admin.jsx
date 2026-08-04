@@ -393,7 +393,7 @@ export default function AdminDashboard() {
     <div className="flex flex-col min-h-screen font-sans" style={{ background: "#FAF9F6" }}>
       {/* ── Topbar ── */}
       <header
-        className="w-full flex-shrink-0 flex flex-row items-center gap-4 px-6 py-3 overflow-x-auto shadow-sm"
+        className="w-full flex-shrink-0 flex flex-row items-center gap-4 px-6 py-3 shadow-sm"
         style={{ background: DB, color: "#fff" }}
       >
         {/* Brand */}
@@ -403,7 +403,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Nav */}
-        <nav className="flex flex-row items-center gap-2 shrink-0 flex-1">
+        <nav className="flex flex-row items-center gap-2 flex-1 overflow-x-auto scrollbar-none min-w-0">
           <button
             className={navItemClasses(view === "upload")}
             onClick={() => setView("upload")}
@@ -481,10 +481,10 @@ export default function AdminDashboard() {
                     <span>+</span> Salary Form
                   </button>
                   <button
-                    onClick={() => openAddModal("refund")}
+                    onClick={() => openAddModal("honorarium")}
                     className="flex items-center justify-center gap-2 text-sm font-bold py-3 px-4 rounded-lg transition-all border-2 border-dashed border-gray-300 hover:border-black hover:bg-gray-50 text-gray-700 hover:text-black"
                   >
-                    <span>+</span> Refund Form
+                    <span>+</span> Honorarium Form
                   </button>
                   <button
                     onClick={() => openAddModal("fellowship")}
@@ -499,10 +499,10 @@ export default function AdminDashboard() {
                     <span>+</span> TA/DA Bill Form
                   </button>
                   <button
-                    onClick={() => openAddModal("honorarium")}
+                    onClick={() => openAddModal("refund")}
                     className="flex items-center justify-center gap-2 text-sm font-bold py-3 px-4 rounded-lg transition-all border-2 border-dashed border-gray-300 hover:border-black hover:bg-gray-50 text-gray-700 hover:text-black"
                   >
-                    <span>+</span> Honorarium Form
+                    <span>+</span> Refund Form
                   </button>
                 </div>
               </div>
@@ -664,14 +664,7 @@ export default function AdminDashboard() {
                               >
                                 Preview
                               </button>
-                               {!r.paymentProcessed && !r.registrarApproved && !r.adminApproved && (
-                               <button
-                               onClick={() => openRecordModal(r)}
-                               className="text-[11px] font-bold uppercase tracking-wider text-black border border-gray-300 hover:bg-gray-100 px-1.5 py-0.5 rounded transition-colors shadow-sm bg-white"
-                                 >
-                                Edit
-                               </button>
-                                )} 
+                             
                               
                               {status === "Approval Pending" && (
                                 <>
