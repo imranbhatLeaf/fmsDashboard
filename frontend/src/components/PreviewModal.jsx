@@ -19,14 +19,25 @@ export default function PreviewModal({ record, onClose }) {
 
   return (
     <>
-      <div 
-        className="fixed inset-0 bg-black/50 z-40 transition-opacity print:hidden" 
+      <style>{`
+        @media print {
+          @page { size: A4 portrait; margin: 12mm 14mm; }
+          body * { visibility: hidden !important; }
+          #preview-print-root * { visibility: visible !important; }
+          #preview-print-root { visibility: visible !important; position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; max-width: 100% !important; height: auto !important; max-height: none !important; overflow: visible !important; background: white !important; box-shadow: none !important; border: none !important; transform: none !important; }
+          #preview-print-root .print-hidden { visibility: hidden !important; display: none !important; }
+          #preview-print-root .sticky { position: relative !important; }
+          #preview-print-root .overflow-y-auto { overflow: visible !important; max-height: none !important; }
+        }
+      `}</style>
+      <div
+        className="fixed inset-0 bg-black/50 z-40 transition-opacity print:hidden print-hidden"
         onClick={onClose}
       />
-      <div className="fixed inset-y-0 right-0 w-full max-w-md bg-[#FAF9F6] shadow-xl z-50 overflow-y-auto border-l border-gray-200 transform transition-transform print:absolute print:inset-0 print:w-full print:max-w-none print:bg-white print:border-none print:shadow-none">
+      <div id="preview-print-root" className="fixed inset-y-0 right-0 w-full max-w-md bg-[#FAF9F6] shadow-xl z-50 overflow-y-auto border-l border-gray-200 transform transition-transform print:absolute print:inset-0 print:w-full print:max-w-none print:bg-white print:border-none print:shadow-none">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-white sticky top-0">
           <h2 className="text-lg font-bold">Transaction Preview</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 print-hidden">
             {/* Req 20: Print official receipt */}
             <button
               onClick={() => window.print()}
@@ -125,46 +136,47 @@ export default function PreviewModal({ record, onClose }) {
               <div className="flex justify-between"><span className="text-gray-500">Transfer</span><span>{record.paymentProcessedAt ? fmtDate(record.paymentProcessedAt) : "Pending"}</span></div>
             </div>
           </div>
-
-          {/* Journey Details */}
-          {record.journeyRows && record.journeyRows.length > 0 && record.journeyRows[0].journey_from && (
+           {/* Journey Details (TA/DA only) */}
+          {record.category === "TA/DA" && (
             <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
               <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">Journey Details</h3>
-              <div className="space-y-3 text-sm">
-                {record.journeyRows.map((row, idx) => (
-                  <div key={idx} className="border-b border-gray-50 pb-2 last:border-0 last:pb-0">
-                    <div className="flex flex-col sm:flex-row sm:justify-between mb-1">
-                      <span className="font-medium text-gray-800">
-                        {row.journey_from} {row.journey_from_date ? `(${new Date(row.journey_from_date).toLocaleDateString()})` : ''} ➔ {row.journey_to} {row.journey_to_date ? `(${new Date(row.journey_to_date).toLocaleDateString()})` : ''}
-                      </span>
-                      <span className="font-mono text-gray-700">₹{row.journey_amount}</span>
-                    </div>
-                    <div className="text-xs text-gray-500">Mode: {row.journey_mode}</div>
+              <div className="space-y-2 text-sm">
+                {(record.journeyRows || []).map((row, idx) => (
+                  <div key={idx} className="border-b pb-2 mb-2">
+                    <p className="text-[10px] font-bold uppercase text-gray-400 mb-1">Primary Journey {idx + 1}</p>
+                    <div className="flex justify-between"><span className="text-gray-500">From</span><span>{row.journey_from || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">To</span><span>{row.journey_to || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Mode</span><span>{row.journey_mode || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Amount</span><span className="font-mono">₹{Number(row.journey_amount || 0).toLocaleString("en-IN")}</span></div>
                   </div>
                 ))}
+                {(record.localJourneyRows || []).filter(row => row.local_journey_from).length > 0 && (
+                  <>
+                    <p className="text-[10px] font-bold uppercase text-gray-400 mb-1 mt-2">Local Journey</p>
+                    {(record.localJourneyRows || []).filter(row => row.local_journey_from).map((row, idx) => (
+                      <div key={idx} className="border-b pb-2 mb-2">
+                        <div className="flex justify-between"><span className="text-gray-500">From</span><span>{row.local_journey_from}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">To</span><span>{row.local_journey_to || "—"}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">Mode</span><span>{row.local_journey_mode || "—"}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">Amount</span><span className="font-mono">₹{Number(row.local_journey_amount || 0).toLocaleString("en-IN")}</span></div>
+                      </div>
+                    ))}
+                  </>
+                )}
+                <div className="flex justify-between border-t pt-2">
+                  <span className="text-gray-800">Gross Total</span>
+                  <span className="font-mono">₹{(() => { const j = (record.journeyRows || []).reduce((s, r) => s + Number(r.journey_amount || 0), 0); const l = (record.localJourneyRows || []).reduce((s, r) => s + Number(r.local_journey_amount || 0), 0); return (j + l).toLocaleString("en-IN"); })()}</span>
+                </div>
+                <div className="flex justify-between font-bold">
+                  <span className="text-gray-800">Net Amount (after TDS)</span>
+                  <span className="font-mono text-green-700">₹{Number(record.amountAfterTds || record.amount || 0).toLocaleString("en-IN")}</span>
+                </div>
+                {record.remarks && <div className="text-xs text-gray-500 pt-1"><strong>Remarks:</strong> {record.remarks}</div>}
               </div>
             </div>
           )}
 
-          {/* Local Journey Details */}
-          {record.localJourneyRows && record.localJourneyRows.length > 0 && record.localJourneyRows[0].local_journey_from && (
-            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">Local Journey Details</h3>
-              <div className="space-y-3 text-sm">
-                {record.localJourneyRows.map((row, idx) => (
-                  <div key={idx} className="border-b border-gray-50 pb-2 last:border-0 last:pb-0">
-                    <div className="flex flex-col sm:flex-row sm:justify-between mb-1">
-                      <span className="font-medium text-gray-800">
-                        {row.local_journey_date ? `${new Date(row.local_journey_date).toLocaleDateString()} : ` : ''}{row.local_journey_from} ➔ {row.local_journey_to}
-                      </span>
-                      <span className="font-mono text-gray-700">₹{row.local_journey_amount}</span>
-                    </div>
-                    <div className="text-xs text-gray-500">Mode: {row.local_journey_mode}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+
 
           {/* Rejection Reason (only shown if rejected) */}
           {record.rejected && record.rejectionReason && (
