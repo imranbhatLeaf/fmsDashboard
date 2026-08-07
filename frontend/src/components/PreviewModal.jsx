@@ -24,7 +24,7 @@ export default function PreviewModal({ record, onClose }) {
           @page { size: A4 portrait; margin: 12mm 14mm; }
           body * { visibility: hidden !important; }
           #preview-print-root * { visibility: visible !important; }
-          #preview-print-root { visibility: visible !important; position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; max-width: 100% !important; height: auto !important; max-height: none !important; overflow: visible !important; background: white !important; box-shadow: none !important; border: none !important; transform: none !important; }
+          #preview-print-root { visibility: visible !important; position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; max-width: 100% !important; height: auto !important; max-height: none !important; overflow: visible !important; background: white !important; box-shadow: none !important; border: none !important; transform: none !important; zoom: 0.85; }
           #preview-print-root .print-hidden { visibility: hidden !important; display: none !important; }
           #preview-print-root .sticky { position: relative !important; }
           #preview-print-root .overflow-y-auto { overflow: visible !important; max-height: none !important; }
@@ -81,6 +81,27 @@ export default function PreviewModal({ record, onClose }) {
               </div>
             </div>
           </div>
+
+          {/* Programme Details */}
+          {(formData.nature_of_programme || formData.programme_nature || formData.title_of_programme || formData.programme_title || formData.programme_applied_for) && (
+            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+              <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">Programme Details</h3>
+              <div className="space-y-2 text-sm">
+                {(formData.nature_of_programme || formData.programme_nature) && (
+                  <div className="flex flex-col mb-2">
+                    <span className="text-gray-500 uppercase text-[10px] font-bold">Nature of the Programme</span>
+                    <span className="font-medium">{formData.nature_of_programme || formData.programme_nature}</span>
+                  </div>
+                )}
+                {(formData.title_of_programme || formData.programme_title || formData.programme_applied_for) && (
+                  <div className="flex flex-col">
+                    <span className="text-gray-500 uppercase text-[10px] font-bold">Title of the Programme</span>
+                    <span className="font-medium">{formData.title_of_programme || formData.programme_title || formData.programme_applied_for}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* User Details */}
           <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
@@ -142,6 +163,7 @@ export default function PreviewModal({ record, onClose }) {
                 {(record.journeyRows || []).map((row, idx) => (
                   <div key={idx} className="border-b pb-2 mb-2">
                     <p className="text-[10px] font-bold uppercase text-gray-400 mb-1">Primary Journey {idx + 1}</p>
+                    {row.journey_from_date && <div className="flex justify-between"><span className="text-gray-500">Date</span><span>{fmtDate(row.journey_from_date)}</span></div>}
                     <div className="flex justify-between"><span className="text-gray-500">From</span><span>{row.journey_from || "—"}</span></div>
                     <div className="flex justify-between"><span className="text-gray-500">To</span><span>{row.journey_to || "—"}</span></div>
                     <div className="flex justify-between"><span className="text-gray-500">Mode</span><span>{row.journey_mode || "—"}</span></div>
@@ -153,6 +175,7 @@ export default function PreviewModal({ record, onClose }) {
                     <p className="text-[10px] font-bold uppercase text-gray-400 mb-1 mt-2">Local Journey</p>
                     {(record.localJourneyRows || []).filter(row => row.local_journey_from).map((row, idx) => (
                       <div key={idx} className="border-b pb-2 mb-2">
+                        {row.local_journey_date && <div className="flex justify-between"><span className="text-gray-500">Date</span><span>{fmtDate(row.local_journey_date)}</span></div>}
                         <div className="flex justify-between"><span className="text-gray-500">From</span><span>{row.local_journey_from}</span></div>
                         <div className="flex justify-between"><span className="text-gray-500">To</span><span>{row.local_journey_to || "—"}</span></div>
                         <div className="flex justify-between"><span className="text-gray-500">Mode</span><span>{row.local_journey_mode || "—"}</span></div>

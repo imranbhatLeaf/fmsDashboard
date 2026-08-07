@@ -1005,18 +1005,14 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                         <button type="button" onClick={addJourneyRow} className="text-xs font-bold text-indigo-600 hover:underline">+ Add Row</button>
                       </div>
                       {journeyRows.map((row, index) => (
-                        <div key={index} className="grid grid-cols-1 md:grid-cols-7 gap-3 items-end border-b pb-3 mb-3">
+                        <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end border-b pb-3 mb-3">
                           <div className="md:col-span-1 flex flex-col">
-                            <label className="text-[10px] font-bold text-gray-500">From Date</label>
+                            <label className="text-[10px] font-bold text-gray-500">Date</label>
                             <input type="date" value={row.journey_from_date || ''} onChange={(e) => handleJourneyChange(index, 'journey_from_date', e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
                           </div>
                           <div className="md:col-span-1 flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500">From *</label>
                             <input type="text" value={row.journey_from} onChange={(e) => handleJourneyChange(index, 'journey_from', e.target.value)} required className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
-                          </div>
-                          <div className="md:col-span-1 flex flex-col">
-                            <label className="text-[10px] font-bold text-gray-500">To Date</label>
-                            <input type="date" value={row.journey_to_date || ''} onChange={(e) => handleJourneyChange(index, 'journey_to_date', e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
                           </div>
                           <div className="md:col-span-1 flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500">To *</label>
