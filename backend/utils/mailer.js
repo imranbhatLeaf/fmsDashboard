@@ -26,7 +26,8 @@ function getSubject(doc, stage = 1) {
   } else if (stage === 3) {
     return `Payment Advice Number & UTRN and Transaction Date in respect of release ${paymentType} -- reg.`;
   } else if (stage === 4) {
-    return `Resubmission of Bank Details Required for Processing of Payment against ${paymentType} -- reg.`;
+    const utrn = doc.bankReferenceNo || doc.utr_rrn_reference_number || "Pending";
+    return `Your ${paymentType} payment vide UTRN (${utrn}) has been rejected -- reg.`;
   }
   return `Payment Notification — ${doc.services}`;
 }
@@ -40,7 +41,8 @@ function getHtmlSubject(doc, stage = 1) {
   } else if (stage === 3) {
     return `Payment Advice Number & UTRN and Transaction Date in respect of release ${paymentType} -- reg.`;
   } else if (stage === 4) {
-    return `Resubmission of Bank Details Required for Processing of Payment against ${paymentType} -- reg.`;
+    const utrn = doc.bankReferenceNo || doc.utr_rrn_reference_number || "Pending";
+    return `Your ${paymentType} payment vide UTRN (${utrn}) has been rejected -- reg.`;
   }
   return `Payment Notification — ${doc.services}`;
 }

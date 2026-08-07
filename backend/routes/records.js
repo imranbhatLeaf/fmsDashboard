@@ -102,6 +102,15 @@ router.get("/", requireAuth, async (req, res) => {
       filter.adminApproved = adminApproved === "true";
     }
     
+    // Allow registrar to see both adminApproved and items they rejected
+    if (req.query.registrarView === "true") {
+      delete filter.adminApproved; // Override strict adminApproved check
+      filter.$or = [
+        { adminApproved: true },
+        { rejected: true, rejectedBy: "registrar" }
+      ];
+    }
+    
     const records = await Record.find(filter).sort({ createdAt: -1 });
     res.json(records);
   } catch (err) {

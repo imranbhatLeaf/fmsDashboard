@@ -32,7 +32,7 @@ export default function Registrar() {
     setLoading(true);
     setError(null);
     try {
-      const query = activePaymentType === "all" ? "?adminApproved=true" : `?adminApproved=true&category=${encodeURIComponent(activePaymentType)}`;
+      const query = activePaymentType === "all" ? "?registrarView=true" : `?registrarView=true&category=${encodeURIComponent(activePaymentType)}`;
       const res = await fetch(`${API_BASE}/api/records${query}`, {
         headers: { Authorization: `Bearer ${auth?.token}` }
       });
