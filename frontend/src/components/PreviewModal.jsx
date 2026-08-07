@@ -83,20 +83,20 @@ export default function PreviewModal({ record, onClose }) {
           </div>
 
           {/* Programme Details */}
-          {(formData.nature_of_programme || formData.programme_nature || formData.title_of_programme || formData.programme_title || formData.programme_applied_for) && (
+          {(record.programmeNature || record.programme_nature || record.nature_of_programme || formData.nature_of_programme || formData.programme_nature || record.programmeTitle || record.programme_title || record.title_of_programme || formData.title_of_programme || formData.programme_title || formData.programme_applied_for) && (
             <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
               <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">Programme Details</h3>
               <div className="space-y-2 text-sm">
-                {(formData.nature_of_programme || formData.programme_nature) && (
+                {(record.programmeNature || record.programme_nature || record.nature_of_programme || formData.nature_of_programme || formData.programme_nature) && (
                   <div className="flex flex-col mb-2">
                     <span className="text-gray-500 uppercase text-[10px] font-bold">Nature of the Programme</span>
-                    <span className="font-medium">{formData.nature_of_programme || formData.programme_nature}</span>
+                    <span className="font-medium">{record.programmeNature || record.programme_nature || record.nature_of_programme || formData.nature_of_programme || formData.programme_nature}</span>
                   </div>
                 )}
-                {(formData.title_of_programme || formData.programme_title || formData.programme_applied_for) && (
+                {(record.programmeTitle || record.programme_title || record.title_of_programme || formData.title_of_programme || formData.programme_title || formData.programme_applied_for) && (
                   <div className="flex flex-col">
                     <span className="text-gray-500 uppercase text-[10px] font-bold">Title of the Programme</span>
-                    <span className="font-medium">{formData.title_of_programme || formData.programme_title || formData.programme_applied_for}</span>
+                    <span className="font-medium">{record.programmeTitle || record.programme_title || record.title_of_programme || formData.title_of_programme || formData.programme_title || formData.programme_applied_for}</span>
                   </div>
                 )}
               </div>
