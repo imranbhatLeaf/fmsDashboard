@@ -74,9 +74,7 @@ router.get("/receipt/:token", rateLimiter, async (req, res) => {
       record.paymentProcessedAt = record.paymentProcessedAt || new Date();
       record.dateOfTransfer = record.dateOfTransfer || new Date();
 
-      if (!record.bankReferenceNo) {
-        record.bankReferenceNo = record.utr_rrn_reference_number || record.utrRrnReferenceNumber || await generateUtrn(record.component || record.services || "ASSSR");
-      }
+      // bankReferenceNo must remain null until admin manually enters it — do NOT auto-populate from UTRN
 
       if (!record.receiptNumber) {
         const prefix = { ASSSR: "A", VMI: "V", DHC: "D", JASSSR: "J" }[record.services] || "X";
@@ -155,9 +153,7 @@ router.get("/:token", rateLimiter, async (req, res) => {
       record.paymentProcessedAt = record.paymentProcessedAt || new Date();
       record.dateOfTransfer = record.dateOfTransfer || new Date();
 
-      if (!record.bankReferenceNo) {
-        record.bankReferenceNo = record.utr_rrn_reference_number || record.utrRrnReferenceNumber || await generateUtrn(record.component || record.services || "ASSSR");
-      }
+      // bankReferenceNo must remain null until admin manually enters it — do NOT auto-populate from UTRN
 
       if (!record.receiptNumber) {
         const prefix = { ASSSR: "A", VMI: "V", DHC: "D", JASSSR: "J" }[record.services] || "X";
@@ -261,15 +257,9 @@ router.post("/:token", rateLimiter, async (req, res) => {
       return res.status(400).json({ message: "PAN Card is required." });
     }
 
-<<<<<<< Updated upstream
-    const PAN_REGEX = /^[A-Za-z]{6}[0-9]{4}$/;
-    if (!PAN_REGEX.test(pan.trim())) {
-      return res.status(400).json({ message: "PAN Card must be 6 letters followed by 4 numbers." });
-=======
     const PAN_REGEX = /^[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}$/;
     if (!PAN_REGEX.test(pan.trim())) {
       return res.status(400).json({ message: "PAN Card must be 5 letters, 4 numbers, then 1 letter (e.g. ABCDE1234F)." });
->>>>>>> Stashed changes
     }
 
     if (!bankBeneficiaryName || !bankBeneficiaryName.trim()) {

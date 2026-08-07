@@ -401,15 +401,9 @@ export default function FormPage() {
     const pan = formData.pan?.trim();
     const ifsc = formData.bankIfsc?.trim();
 
-<<<<<<< Updated upstream
-  const PAN_REGEX = /^[A-Za-z]{6}[0-9]{4}$/;
-    if (!pan || !PAN_REGEX.test(pan)) {
-      setFormError("PAN Card must be 6 letters followed by 4 numbers.");
-=======
   const PAN_REGEX = /^[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}$/;
     if (!pan || !PAN_REGEX.test(pan)) {
       setFormError("PAN Card must be 5 letters, 4 numbers, then 1 letter (e.g. ABCDE1234F).");
->>>>>>> Stashed changes
       setSubmitting(false);
       return;
     }

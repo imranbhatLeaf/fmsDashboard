@@ -21,7 +21,7 @@ export default function Registrar() {
   const [records, setRecords]               = useState([]);
   const [loading, setLoading]               = useState(false);
   const [error, setError]                   = useState(null);
-  const [sortConfig, setSortConfig] = useState({ key: "dateOfEntry", direction: "desc" });
+
   const [summary, setSummary] = useState({ total: 0, sent: 0, pending: 0, failed: 0 });
   const [showRecycleBin, setShowRecycleBin] = useState(false);
   const [recycleBinLoading, setRecycleBinLoading] = useState(false);
@@ -198,15 +198,6 @@ export default function Registrar() {
   }
 
 
-  // Excel sorting functions
-  const handleSort = (key) => {
-    let direction = "asc";
-    if (sortConfig.key === key && sortConfig.direction === "asc") {
-      direction = "desc";
-    }
-    setSortConfig({ key, direction });
-  };
-
   const getRecordStatus = (r) => {
     if (r.rejected) return "Rejected";
     if (r.paymentProcessed) return "Paid";
@@ -216,49 +207,11 @@ export default function Registrar() {
     return "Form Pending";
   };
 
-  const getFieldValue = (r, key) => {
-    switch (key) {
-      case "name": return r.name || "";
-      case "services": return r.services || r.component || "";
-      case "category": return r.category || "";
-      case "amount": return Number(r.amount) || 0;
-      case "amountAfterTds": return r.amountAfterTds ? Number(r.amountAfterTds) : ((r.category === "Refund" || r.category === "Fellowship") ? Number(r.amount) || 0 : Number(r.amount * 0.9) || 0);
-      case "dateOfEntry": return new Date(r.dateOfEntry || r.createdAt).getTime();
-      case "dateOfUpload": return r.dateOfUpload ? new Date(r.dateOfUpload).getTime() : 0;
-      case "dateOfForwarding": return r.dateOfForwarding || r.adminApprovedAt ? new Date(r.dateOfForwarding || r.adminApprovedAt).getTime() : 0;
-      case "dateOfApproval": return r.dateOfApproval || r.registrarApprovedAt ? new Date(r.dateOfApproval || r.registrarApprovedAt).getTime() : 0;
-      case "dateOfTransfer": return r.dateOfTransfer ? new Date(r.dateOfTransfer).getTime() : 0;
-      case "status": return getRecordStatus(r);
-      case "utrn": return r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "";
-      default: return "";
-    }
-  };
-
-  const sortedRecords = useMemo(() => {
-    return [...records].sort((a, b) => {
-      if (!sortConfig.key) return 0;
-      const aVal = getFieldValue(a, sortConfig.key);
-      const bVal = getFieldValue(b, sortConfig.key);
-      if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
-    });
-  }, [records, sortConfig]);
-
-  const renderSortableHeader = (label, key, isRight = false) => {
-    const isSorted = sortConfig.key === key;
-    return (
-      <th
-        onClick={() => handleSort(key)}
-        className={`px-3 py-2 border border-gray-300 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 cursor-pointer select-none ${isRight ? "text-right" : ""}`}
-      >
-        <div className={`flex items-center gap-1 ${isRight ? "justify-end" : ""}`}>
-          {label}
-          {isSorted ? (sortConfig.direction === "asc" ? " ↑" : " ↓") : " ↕"}
-        </div>
-      </th>
-    );
-  };
+  // Always show latest first
+  const sortedRecords = useMemo(() =>
+    [...records].sort((a, b) => new Date(b.createdAt || b.dateOfEntry || 0) - new Date(a.createdAt || a.dateOfEntry || 0)),
+    [records]
+  );
 
   const totalAmount = records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN") : "—";
@@ -314,41 +267,7 @@ export default function Registrar() {
 
       <main className="px-6 md:px-10 py-4 max-w-[1600px] w-full mx-auto">
 
-        {/* Page title */}
-        <div className="mb-2">
-          <h1 className="font-serif text-xl font-bold" style={{ color: DB }}>Transaction Overview</h1>
-          <p className="text-xs mt-0.5" style={{ color: "#8899aa" }}>View all financial transactions and their email status.</p>
-        </div>
 
-        {/* Summary cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
-          {[
-            { label: "Total Transactions", value: summary.total },
-            { label: "Emails Sent",        value: summary.sent },
-            { label: "Pending",            value: summary.pending },
-            { label: "Failed",             value: summary.failed },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-white rounded-xl border px-4 py-2" style={{ borderColor: "#dde3ec" }}>
-              <p className="text-[10px] uppercase tracking-widest font-semibold mb-1" style={{ color: "#99aabb" }}>{stat.label}</p>
-              <p className="text-2xl font-bold tabular-nums" style={{ color: DB }}>{stat.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Total amount card */}
-        <div className="rounded-xl px-6 py-2 mb-2 flex items-center justify-between border" style={{ background: "#FAF9F6", borderColor: "#dde3ec" }}>
-          <div>
-            <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-1 font-bold">Total Amount</p>
-            <p className="font-serif text-3xl font-bold tabular-nums text-black">
-              ₹{totalAmount.toLocaleString("en-IN")}
-            </p>
-          </div>
-          <div className="text-gray-300">
-            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75" />
-            </svg>
-          </div>
-        </div>
 
         {/* Category filter tabs + Recycle Bin toggle */}
         <div className="flex gap-2 flex-wrap mb-5 items-center">
@@ -469,13 +388,13 @@ export default function Registrar() {
                 <table className="w-full border-collapse text-left whitespace-nowrap" style={{ fontSize: "13px" }}>
                   <thead>
                     <tr>
-                      {renderSortableHeader("Name", "name")}
-                      {renderSortableHeader("Component", "services")}
-                      {renderSortableHeader("Category", "category")}
-                      {renderSortableHeader("Amount", "amount", true)}
-                      {renderSortableHeader("After TDS", "amountAfterTds", true)}
-                      {renderSortableHeader("UTRN", "utrn")}
-                      {renderSortableHeader("Status", "status")}
+                      <th className="px-3 py-2 border border-gray-300 text-xs font-bold text-gray-700 bg-gray-100">Name</th>
+                      <th className="px-3 py-2 border border-gray-300 text-xs font-bold text-gray-700 bg-gray-100">Component</th>
+                      <th className="px-3 py-2 border border-gray-300 text-xs font-bold text-gray-700 bg-gray-100">Category</th>
+                      <th className="px-3 py-2 border border-gray-300 text-xs font-bold text-gray-700 bg-gray-100 text-right">Amount</th>
+                      <th className="px-3 py-2 border border-gray-300 text-xs font-bold text-gray-700 bg-gray-100 text-right">After TDS</th>
+                      <th className="px-3 py-2 border border-gray-300 text-xs font-bold text-gray-700 bg-gray-100">UTRN</th>
+                      <th className="px-3 py-2 border border-gray-300 text-xs font-bold text-gray-700 bg-gray-100">Status</th>
                       <th className="px-2 py-1 border border-gray-300 text-xs font-bold text-gray-700 bg-gray-100">Actions</th>
                     </tr>
                   </thead>
@@ -518,11 +437,7 @@ export default function Registrar() {
                               {status === "Rejected" && r.rejectedAt && (
                                 <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.rejectedAt)}</div>
                               )}
-<<<<<<< Updated upstream
-                              {status === "Approved by Registrar, Pending for Payment" && (r.registrarApprovedAt || r.dateOfApproval) && (
-=======
                               {(status === "Approved" || status === "Approved by Registrar, Pending for Payment") && (r.registrarApprovedAt || r.dateOfApproval) && (
->>>>>>> Stashed changes
                                 <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.registrarApprovedAt || r.dateOfApproval)}</div>
                               )}
                               {status === "Pending Registrar Approval" && (r.adminApprovedAt || r.dateOfForwarding) && (
@@ -567,16 +482,18 @@ export default function Registrar() {
                               )}
 
 
-                              {/* Req 16: Delete button — limited to Registrar only */}
-                              <button
-                                onClick={() => handleDelete(r._id)}
-                                className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border transition-colors"
-                                style={{ color: "#800000", borderColor: "#800000", background: "#fff" }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = "#800000"; e.currentTarget.style.color = "#fff"; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = "#800000"; }}
-                              >
-                                Delete
-                              </button>
+                              {/* Req 16: Delete button — limited to Registrar only, hidden after approval */}
+                              {status !== "Approved" && status !== "Paid" && (
+                                <button
+                                  onClick={() => handleDelete(r._id)}
+                                  className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border transition-colors"
+                                  style={{ color: "#800000", borderColor: "#800000", background: "#fff" }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.background = "#800000"; e.currentTarget.style.color = "#fff"; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = "#800000"; }}
+                                >
+                                  Delete
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

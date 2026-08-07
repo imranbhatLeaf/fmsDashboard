@@ -186,13 +186,8 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
 
   useEffect(() => {
     if (selectedFormType === 'tada') {
-<<<<<<< Updated upstream
-      setJourneyRows(formData.journeyRows && formData.journeyRows.length > 0 ? formData.journeyRows : [{ journey_from_date: '', journey_from: '', journey_to_date: '', journey_to: '', journey_mode: 'Road', journey_amount: '' }]);
-      setLocalJourneyRows(formData.localJourneyRows && formData.localJourneyRows.length > 0 ? formData.localJourneyRows : [{ local_journey_date: '', local_journey_from: '', local_journey_to: '', local_journey_mode: 'Bus', local_journey_amount: '' }]);
-=======
       setJourneyRows(prev => prev.length > 0 ? prev : (formData.journeyRows && formData.journeyRows.length > 0 ? formData.journeyRows : [{ journey_from: '', journey_to: '', journey_mode: 'Road', journey_amount: '' }]));
       setLocalJourneyRows(prev => prev.length > 0 ? prev : (formData.localJourneyRows && formData.localJourneyRows.length > 0 ? formData.localJourneyRows : [{ local_journey_from: '', local_journey_to: '', local_journey_mode: 'Bus', local_journey_amount: '' }]));
->>>>>>> Stashed changes
     }
   }, [selectedFormType]);
 

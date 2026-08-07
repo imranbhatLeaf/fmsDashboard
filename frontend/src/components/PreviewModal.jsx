@@ -115,15 +115,13 @@ export default function PreviewModal({ record, onClose }) {
           </div>
 
           {/* Bank Reference & Date of Transfer (Req 17) */}
-          {(record.bankReferenceNo || record.dateOfTransfer) && (
-            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-              <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">Payment Info</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-gray-500">Bank Reference No.</span><span className="font-mono">{record.bankReferenceNo || "—"}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Date of Transfer</span><span>{fmtDate(record.dateOfTransfer)}</span></div>
-              </div>
+          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+            <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">Payment Info</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-gray-500">Bank Reference No.</span><span className="font-mono">{record.bankReferenceNo || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Date of Transfer</span><span>{record.dateOfTransfer ? fmtDate(record.dateOfTransfer) : "—"}</span></div>
             </div>
-          )}
+          </div>
 
           {/* Dates */}
           <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
@@ -175,11 +173,6 @@ export default function PreviewModal({ record, onClose }) {
               </div>
             </div>
           )}
-<<<<<<< Updated upstream
-
-
-=======
->>>>>>> Stashed changes
 
           {/* Rejection Reason (only shown if rejected) */}
           {record.rejected && record.rejectionReason && (

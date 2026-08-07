@@ -136,7 +136,7 @@ export default function AdminDashboard() {
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
   function openProcessModal(record) {
-    const utrn = record.utr_rrn_reference_number || record.utrRrnReferenceNumber || record.bankReferenceNo || "—";
+    const utrn = record.utr_rrn_reference_number || record.utrRrnReferenceNumber || "—";
     setProcessModal({ id: record._id, utrn });
     setProcessBankRef("");
     // Default date to today
@@ -157,6 +157,25 @@ export default function AdminDashboard() {
     }
     if (!processDate) {
       setProcessError("Date of Transfer is required.");
+      return;
+    }
+    // Date of Transfer must be between upload date and today
+    const uploadRecord = records.find(r => r._id === processModal.id);
+    const minDate = uploadRecord ? new Date(uploadRecord.dateOfUpload || uploadRecord.createdAt) : null;
+    const selectedDate = new Date(processDate);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    if (minDate) {
+      const minD = new Date(minDate);
+      minD.setHours(0, 0, 0, 0);
+      selectedDate.setHours(0, 0, 0, 0);
+      if (selectedDate < minD) {
+        setProcessError(`Date of Transfer cannot be before the upload date (${minD.toLocaleDateString('en-IN')}).`);
+        return;
+      }
+    }
+    if (new Date(processDate) > today) {
+      setProcessError('Date of Transfer cannot be in the future.');
       return;
     }
     setProcessSubmitting(true);
@@ -192,7 +211,7 @@ export default function AdminDashboard() {
     const link = `https://finance.asssr.org/track`;
     navigator.clipboard.writeText(link);}
 
-  // Generic Add/Edit
+  // Generic Add
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [activeRecord, setActiveRecord] = useState(null);
   const [initialFormType, setInitialFormType] = useState("standard");
@@ -200,11 +219,6 @@ export default function AdminDashboard() {
   function openAddModal(formType = "standard") {
     setActiveRecord(null);
     setInitialFormType(formType);
-    setShowRecordModal(true);
-  }
-
-  function openRecordModal(record) {
-    setActiveRecord(record);
     setShowRecordModal(true);
   }
 
@@ -250,8 +264,7 @@ export default function AdminDashboard() {
 
 
 
-  // Excel sorting configuration
-  const [sortConfig, setSortConfig] = useState({ key: "dateOfEntry", direction: "desc" });
+
 
   const fetchRecords = useCallback(async () => {
     if (view === "upload") return;
@@ -326,15 +339,6 @@ export default function AdminDashboard() {
 
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN") : "—";
 
-  // Excel sorting functions
-  const handleSort = (key) => {
-    let direction = "asc";
-    if (sortConfig.key === key && sortConfig.direction === "asc") {
-      direction = "desc";
-    }
-    setSortConfig({ key, direction });
-  };
-
   const getRecordStatus = (r) => {
     if (r.rejected) return "Rejected";
     if (r.paymentProcessed) return "Paid";
@@ -344,50 +348,41 @@ export default function AdminDashboard() {
     return "Form Pending";
   };
 
-  const getFieldValue = (r, key) => {
-    switch (key) {
-      case "name": return r.name || "";
-      case "services": return r.services || r.component || "";
-      case "category": return r.category || "";
-      case "amount": return Number(r.amount) || 0;
-      case "amountAfterTds": return r.amountAfterTds ? Number(r.amountAfterTds) : ((r.category === "Refund" || r.category === "Fellowship") ? Number(r.amount) || 0 : Number(r.amount * 0.9) || 0);
-      case "dateOfEntry": return new Date(r.dateOfEntry || r.createdAt).getTime();
-      case "dateOfUpload": return r.dateOfUpload ? new Date(r.dateOfUpload).getTime() : 0;
-      case "dateOfForwarding": return r.dateOfForwarding || r.adminApprovedAt ? new Date(r.dateOfForwarding || r.adminApprovedAt).getTime() : 0;
-      case "dateOfApproval": return r.dateOfApproval || r.registrarApprovedAt ? new Date(r.dateOfApproval || r.registrarApprovedAt).getTime() : 0;
-      case "dateOfTransfer": return r.dateOfTransfer ? new Date(r.dateOfTransfer).getTime() : 0;
-      case "status": return getRecordStatus(r);
-      case "utrn": return r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "";
-      case "bankReferenceNo": return r.bankReferenceNo || "";
-      default: return "";
-    }
-  };
+  const displayRecords = useMemo(() =>
+    [...records].sort((a, b) => new Date(b.createdAt || b.dateOfEntry || 0) - new Date(a.createdAt || a.dateOfEntry || 0)),
+    [records]
+  );
 
-  const sortedRecords = useMemo(() => {
-    return [...records].sort((a, b) => {
-      if (!sortConfig.key) return 0;
-      const aVal = getFieldValue(a, sortConfig.key);
-      const bVal = getFieldValue(b, sortConfig.key);
-      if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
+  function downloadCSV() {
+    const sorted = [...records].sort((a, b) => new Date(b.createdAt || b.dateOfEntry || 0) - new Date(a.createdAt || a.dateOfEntry || 0));
+    const headers = ['UTRN', 'Payee', 'Component', 'Category', 'Amount', 'After TDS', 'Uploaded', 'Forwarded', 'Approved', 'Bank Ref.', 'Status'];
+    const rows = sorted.map(r => {
+      const status = getRecordStatus(r);
+      const net = r.amountAfterTds ? Number(r.amountAfterTds) : (r.category === 'Refund' || r.category === 'Fellowship' ? Number(r.amount) : Number(r.amount * 0.9));
+      return [
+        r.utr_rrn_reference_number || r.utrRrnReferenceNumber || '',
+        r.name || '',
+        r.services || r.component || '',
+        r.category || '',
+        Number(r.amount) || 0,
+        net || 0,
+        r.dateOfUpload || r.dateOfEntry || r.createdAt ? new Date(r.dateOfUpload || r.dateOfEntry || r.createdAt).toLocaleDateString('en-IN') : '',
+        r.dateOfForwarding || r.adminApprovedAt ? new Date(r.dateOfForwarding || r.adminApprovedAt).toLocaleDateString('en-IN') : '',
+        r.dateOfApproval || r.registrarApprovedAt ? new Date(r.dateOfApproval || r.registrarApprovedAt).toLocaleDateString('en-IN') : '',
+        r.bankReferenceNo || '',
+        status,
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
     });
-  }, [records, sortConfig]);
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `financial-records-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
-  const renderSortableHeader = (label, key, isRight = false) => {
-    const isSorted = sortConfig.key === key;
-    return (
-      <th
-        onClick={() => handleSort(key)}
-        className={`px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 cursor-pointer select-none ${isRight ? "text-right" : ""}`}
-      >
-        <div className={`flex items-center gap-1 ${isRight ? "justify-end" : ""}`}>
-          {label}
-          {isSorted ? (sortConfig.direction === "asc" ? " ↑" : " ↓") : " ↕"}
-        </div>
-      </th>
-    );
-  };
 
   return (
     <div className="flex flex-col min-h-screen font-sans" style={{ background: "#FAF9F6" }}>
@@ -558,12 +553,23 @@ export default function AdminDashboard() {
           /* ── Transaction records view ── */
           <section className="w-full">
             <header className="mb-4">
-              <h1 className="font-serif text-2xl font-bold flex items-center gap-2.5 mb-1.5" style={{ color: DB }}>
-                {view === "all" ? "Financial Records" : view}
-              </h1>
-              <p className="text-sm" style={{ color: "#667" }}>
-                {records.length} transaction{records.length === 1 ? "" : "s"}
-              </p>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <h1 className="font-serif text-2xl font-bold flex items-center gap-2.5 mb-1.5" style={{ color: DB }}>
+                    {view === "all" ? "Financial Records" : view}
+                  </h1>
+                  <p className="text-sm" style={{ color: "#667" }}>
+                    {records.length} transaction{records.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <button
+                  onClick={downloadCSV}
+                  className="text-[11px] font-bold uppercase tracking-wider text-white bg-black hover:bg-gray-800 px-3 py-1.5 rounded-md transition-colors shadow-sm flex items-center gap-1.5"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                  Download CSV
+                </button>
+              </div>
             </header>
 
             {recordsLoading && (
@@ -585,22 +591,22 @@ export default function AdminDashboard() {
                   <table className="w-full border-collapse text-left" style={{ fontSize: "13px" }}>
                     <thead>
                       <tr>
-                        {renderSortableHeader("Payee", "name")}
-                        {renderSortableHeader("Comp", "services")}
-                        {renderSortableHeader("Category", "category")}
-                        {renderSortableHeader("Amount", "amount", true)}
-                        {renderSortableHeader("After TDS", "amountAfterTds", true)}
-                        {renderSortableHeader("Uploaded", "dateOfUpload")}
-                        {renderSortableHeader("Forwarded", "dateOfForwarding")}
-                        {renderSortableHeader("Approved", "dateOfApproval")}
-                        {renderSortableHeader("UTRN", "utrn")}
-                        {renderSortableHeader("Bank Ref.", "bankReferenceNo")}
-                        {renderSortableHeader("Status", "status")}
+                        <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100">UTRN</th>
+                        <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100">Payee</th>
+                        <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100">Comp</th>
+                        <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100">Category</th>
+                        <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100 text-right">Amount</th>
+                        <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100 text-right">After TDS</th>
+                        <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100">Uploaded</th>
+                        <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100">Forwarded</th>
+                        <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100">Approved</th>
+                        <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100">Bank Ref.</th>
+                        <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100">Status</th>
                         <th className="px-0.5 py-1 border border-gray-300 text-[11px] font-bold text-gray-700 bg-gray-100">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedRecords.map((r) => {
+                      {displayRecords.map((r) => {
                         const status = getRecordStatus(r);
                         
                         return (
@@ -608,6 +614,7 @@ export default function AdminDashboard() {
                           key={r._id || r.email}
                           className="hover:bg-gray-50 transition-colors border-b border-gray-300"
                         >
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-500 font-mono text-[11px]">{r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "—"}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300 font-medium text-gray-800">{r.name}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600">{r.services}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600">{r.category}</td>
@@ -621,8 +628,7 @@ export default function AdminDashboard() {
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfForwarding || r.adminApprovedAt)}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfApproval || r.registrarApprovedAt)}</td>
           
-                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-500 font-mono text-[11px]">{r.utr_rrn_reference_number || r.utrRrnReferenceNumber || "—"}</td>
-                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-500 font-mono text-[11px]">{r.bankReferenceNo || "—"}</td>
+                          <td className="px-0.5 py-1 border-r border-gray-300 text-gray-500 font-mono text-[11px]">{r.paymentProcessed ? (r.bankReferenceNo || "—") : ""}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300">
                             <span
                               className="inline-block text-[11px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
@@ -686,20 +692,12 @@ export default function AdminDashboard() {
                                 <span className="text-[11px] text-gray-400 italic">Awaiting Registrar</span>
                               )}
                               {status === "Approved by Registrar, Pending for Payment" && (
-                                <>
-                                  <button
-                                    onClick={() => openProcessModal(r)}
-                                    className="text-[11px] font-bold uppercase tracking-wider text-white bg-green-600 hover:bg-green-700 px-1.5 py-0.5 rounded transition-colors shadow-sm"
-                                  >
-                                    Process
-                                  </button>
-                                  <button
-                                    onClick={() => handleAdminReject(r._id)}
-                                    className="text-[11px] font-bold uppercase tracking-wider text-red-600 px-1.5 py-0.5 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
-                                  >
-                                    Reject
-                                  </button>
-                                </>
+                                <button
+                                  onClick={() => openProcessModal(r)}
+                                  className="text-[11px] font-bold uppercase tracking-wider text-white bg-green-600 hover:bg-green-700 px-1.5 py-0.5 rounded transition-colors shadow-sm"
+                                >
+                                  Process
+                                </button>
                               )}
                               {status === "Paid" && (
                                 <button
@@ -810,6 +808,11 @@ export default function AdminDashboard() {
                   style={{ borderColor: !processDate && processError ? "#ef4444" : "#d1d5db" }}
                   onFocus={(e) => (e.currentTarget.style.borderColor = "#000")}
                   onBlur={(e) => (e.currentTarget.style.borderColor = !processDate && processError ? "#ef4444" : "#d1d5db")}
+                  min={(() => {
+                    const rec = records.find(r => r._id === processModal?.id);
+                    const d = rec ? new Date(rec.dateOfUpload || rec.createdAt) : null;
+                    return d ? d.toISOString().slice(0, 10) : undefined;
+                  })()}
                   max={new Date().toISOString().slice(0, 10)}
                 />
               </div>

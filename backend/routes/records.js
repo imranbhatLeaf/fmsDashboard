@@ -68,9 +68,7 @@ router.get("/", requireAuth, async (req, res) => {
       record.paymentProcessedAt = record.paymentProcessedAt || new Date();
       record.dateOfTransfer = record.dateOfTransfer || new Date();
 
-      if (!record.bankReferenceNo) {
-        record.bankReferenceNo = record.utr_rrn_reference_number || record.utrRrnReferenceNumber || await generateUtrn(record.component || record.services || "ASSSR");
-      }
+      // bankReferenceNo must remain null until admin manually enters it — do NOT auto-populate from UTRN
 
       if (!record.receiptNumber) {
         const prefix = { ASSSR: "ASR", VMI: "VMI", DHC: "DHC", JASSSR: "JAS" }[record.services] || "X";
@@ -286,7 +284,7 @@ router.post("/", requireAuth, requireRole(["admin"]), async (req, res) => {
       data.utr_rrn_reference_number = await generateUtrn(data.component || data.services || "ASSSR");
     }
     data.utrRrnReferenceNumber = data.utr_rrn_reference_number;
-    data.bankReferenceNo = data.utr_rrn_reference_number;
+    // bankReferenceNo intentionally left null — admin must enter it manually via the process modal
     // Use UTRN as the form link token so URL becomes /form/<UTRN>
     data.payee_link_token = data.utr_rrn_reference_number;
     data.token = data.utr_rrn_reference_number;
