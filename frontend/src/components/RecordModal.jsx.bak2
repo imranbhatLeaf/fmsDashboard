@@ -186,15 +186,10 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
 
   useEffect(() => {
     if (selectedFormType === 'tada') {
-<<<<<<< Updated upstream
-      setJourneyRows(formData.journeyRows && formData.journeyRows.length > 0 ? formData.journeyRows : [{ journey_from_date: '', journey_from: '', journey_to_date: '', journey_to: '', journey_mode: 'Road', journey_amount: '' }]);
-      setLocalJourneyRows(formData.localJourneyRows && formData.localJourneyRows.length > 0 ? formData.localJourneyRows : [{ local_journey_date: '', local_journey_from: '', local_journey_to: '', local_journey_mode: 'Bus', local_journey_amount: '' }]);
-=======
-      setJourneyRows(prev => prev.length > 0 ? prev : (formData.journeyRows && formData.journeyRows.length > 0 ? formData.journeyRows : [{ journey_from: '', journey_to: '', journey_mode: 'Road', journey_amount: '' }]));
-      setLocalJourneyRows(prev => prev.length > 0 ? prev : (formData.localJourneyRows && formData.localJourneyRows.length > 0 ? formData.localJourneyRows : [{ local_journey_from: '', local_journey_to: '', local_journey_mode: 'Bus', local_journey_amount: '' }]));
->>>>>>> Stashed changes
+      setJourneyRows(formData.journeyRows && formData.journeyRows.length > 0 ? formData.journeyRows : [{ journey_from: '', journey_to: '', journey_mode: 'Road', journey_amount: '' }]);
+      setLocalJourneyRows(formData.localJourneyRows && formData.localJourneyRows.length > 0 ? formData.localJourneyRows : [{ local_journey_from: '', local_journey_to: '', local_journey_mode: 'Bus', local_journey_amount: '' }]);
     }
-  }, [selectedFormType]);
+  }, [selectedFormType, formData.journeyRows, formData.localJourneyRows]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -202,15 +197,19 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
   };
 
   const handleJourneyChange = (index, field, val) => {
-    setJourneyRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: val } : row));
+    const updated = [...journeyRows];
+    updated[index][field] = val;
+    setJourneyRows(updated);
   };
 
   const handleLocalJourneyChange = (index, field, val) => {
-    setLocalJourneyRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: val } : row));
+    const updated = [...localJourneyRows];
+    updated[index][field] = val;
+    setLocalJourneyRows(updated);
   };
 
   const addJourneyRow = () => {
-    setJourneyRows([...journeyRows, { journey_from_date: '', journey_from: '', journey_to_date: '', journey_to: '', journey_mode: 'Road', journey_amount: '' }]);
+    setJourneyRows([...journeyRows, { journey_from: '', journey_to: '', journey_mode: 'Road', journey_amount: '' }]);
   };
 
   const removeJourneyRow = (index) => {
@@ -218,7 +217,7 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
   };
 
   const addLocalJourneyRow = () => {
-    setLocalJourneyRows([...localJourneyRows, { local_journey_date: '', local_journey_from: '', local_journey_to: '', local_journey_mode: 'Bus', local_journey_amount: '' }]);
+    setLocalJourneyRows([...localJourneyRows, { local_journey_from: '', local_journey_to: '', local_journey_mode: 'Bus', local_journey_amount: '' }]);
   };
 
   const removeLocalJourneyRow = (index) => {
@@ -310,26 +309,16 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
         return;
       }
 
-      // Nature of Programme & Title — required and min 4 chars for all non-refund forms
+      // Nature of Programme & Title (min 4 chars) — for all non-refund forms
       if (selectedFormType !== 'refund') {
-        const natureVal = (formData.nature_of_programme || formData.programme_nature || formData.natureOfProgramme || "").trim();
-        if (!natureVal || natureVal.length === 0) {
-          setError("Nature of Programme is required.");
-          setSaving(false);
-          return;
-        }
-        if (natureVal.length < 4) {
+        const natureVal = (dataToSave.nature_of_programme || dataToSave.programme_nature || "").trim();
+        if (natureVal && natureVal.length < 4) {
           setError("Nature of Programme must be at least 4 characters.");
           setSaving(false);
           return;
         }
-        const titleVal = (formData.title_of_programme || formData.programme_title || formData.titleOfProgramme || "").trim();
-        if (!titleVal || titleVal.length === 0) {
-          setError("Title of Programme is required.");
-          setSaving(false);
-          return;
-        }
-        if (titleVal.length < 4) {
+        const titleVal = (dataToSave.title_of_programme || dataToSave.programme_title || "").trim();
+        if (titleVal && titleVal.length < 4) {
           setError("Title of Programme must be at least 4 characters.");
           setSaving(false);
           return;
@@ -390,24 +379,8 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
         dataToSave.amount = Number(formData.passed_for_payment_amount || formData.total || formData.amount || 0);
         dataToSave.claimant_signature = formData.claimant_signature;
       } else if (selectedFormType === 'tada') {
-        if (!formData.nature_of_programme && !formData.programme_nature) {
-          setError('Nature of Programme is required.');
-          setSaving(false);
-          return;
-        }
-        if (!formData.title_of_programme && !formData.programme_title) {
-          setError('Title of Programme is required.');
-          setSaving(false);
-          return;
-        }
         dataToSave.form_type = 'tada';
         dataToSave.category = 'TA/DA';
-        dataToSave.programme_nature = formData.nature_of_programme || formData.programme_nature;
-        dataToSave.programme_title = formData.title_of_programme || formData.programme_title;
-        dataToSave.nature_of_programme = dataToSave.programme_nature;
-        dataToSave.title_of_programme = dataToSave.programme_title;
-        dataToSave.programmeNature = dataToSave.programme_nature;
-        dataToSave.programmeTitle = dataToSave.programme_title;
         // Journey tables
         dataToSave.journeyRows = journeyRows;
         dataToSave.localJourneyRows = localJourneyRows;
@@ -478,97 +451,6 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
         dataToSave.honorarium_as_per_norms = formData.honorarium_as_per_norms;
         dataToSave.claimant_signature = formData.claimant_signature;
       }
-      // Journey fields validation for TA/DA
-      if (selectedFormType === 'tada') {
-        const LOCATION_REGEX = /[A-Za-z]/;
-        for (let i = 0; i < journeyRows.length; i++) {
-          const row = journeyRows[i];
-          if (!row.journey_from || !row.journey_from.trim()) {
-            setError(`Journey row ${i + 1}: "From" is required.`);
-            setSaving(false);
-            return;
-          }
-          if (!LOCATION_REGEX.test(row.journey_from)) {
-            setError(`Journey row ${i + 1}: "From" must contain letters, not just numbers.`);
-            setSaving(false);
-            return;
-          }
-          if (!row.journey_to || !row.journey_to.trim()) {
-            setError(`Journey row ${i + 1}: "To" is required.`);
-            setSaving(false);
-            return;
-          }
-          if (!LOCATION_REGEX.test(row.journey_to)) {
-            setError(`Journey row ${i + 1}: "To" must contain letters, not just numbers.`);
-            setSaving(false);
-            return;
-          }
-          if (!row.journey_amount || Number(row.journey_amount) <= 0) {
-            setError(`Journey row ${i + 1}: Amount is required and must be greater than 0.`);
-            setSaving(false);
-            return;
-          }
-        }
-        for (let i = 0; i < localJourneyRows.length; i++) {
-          const row = localJourneyRows[i];
-          const hasAnyLocal = row.local_journey_from || row.local_journey_to || row.local_journey_amount;
-          if (hasAnyLocal) {
-            if (!row.local_journey_from || !row.local_journey_from.trim()) {
-              setError(`Local journey row ${i + 1}: "From" is required.`);
-              setSaving(false);
-              return;
-            }
-            if (!LOCATION_REGEX.test(row.local_journey_from)) {
-              setError(`Local journey row ${i + 1}: "From" must contain letters, not just numbers.`);
-              setSaving(false);
-              return;
-            }
-            if (!row.local_journey_to || !row.local_journey_to.trim()) {
-              setError(`Local journey row ${i + 1}: "To" is required.`);
-              setSaving(false);
-              return;
-            }
-            if (!LOCATION_REGEX.test(row.local_journey_to)) {
-              setError(`Local journey row ${i + 1}: "To" must contain letters, not just numbers.`);
-              setSaving(false);
-              return;
-            }
-            if (!row.local_journey_amount || Number(row.local_journey_amount) <= 0) {
-              setError(`Local journey row ${i + 1}: Amount is required and must be greater than 0.`);
-              setSaving(false);
-              return;
-            }
-          }
-        }
-      }
-
-      // Final required field check before save
-      if (selectedFormType !== 'refund') {
-        const finalNature = (dataToSave.nature_of_programme || dataToSave.programme_nature || "").trim();
-        if (!finalNature || finalNature.length < 4) {
-          setError("Nature of Programme is required and must be at least 4 characters.");
-          setSaving(false);
-          return;
-        }
-        const finalTitle = (dataToSave.title_of_programme || dataToSave.programme_title || "").trim();
-        if (!finalTitle || finalTitle.length < 4) {
-          setError("Title of Programme is required and must be at least 4 characters.");
-          setSaving(false);
-          return;
-        }
-        const finalDesig = (dataToSave.designation || "").trim();
-        if (!finalDesig || finalDesig.length < 2) {
-          setError("Designation is required.");
-          setSaving(false);
-          return;
-        }
-        const finalAddress = (dataToSave.address || "").trim();
-        if (!finalAddress || finalAddress.length < 4) {
-          setError("Address is required.");
-          setSaving(false);
-          return;
-        }
-      }
       await onSave(dataToSave);
     } catch (err) {
       setError(err.message || "Failed to save record.");
@@ -588,12 +470,6 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
     let val = formData[name] || "";
     if (name === 'component' && !val) {
       val = formData.services || "";
-    }
-    if (name === 'nature_of_programme' && !val) {
-      val = formData.programme_nature || "";
-    }
-    if (name === 'title_of_programme' && !val) {
-      val = formData.programme_title || "";
     }
     if (type === 'date' && val && val.includes('T')) {
       val = val.split('T')[0];
@@ -870,8 +746,8 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                       <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2 font-serif">Journey Details</h3>
                       {journeyRows.map((row, idx) => (
                         <div key={idx} className="border-b pb-2 mb-2 text-sm grid grid-cols-2 gap-2">
-                          <div><strong>From:</strong> {row.journey_from} {row.journey_from_date ? `(${new Date(row.journey_from_date).toLocaleDateString()})` : ''} <br/>➔ <strong>To:</strong> {row.journey_to} {row.journey_to_date ? `(${new Date(row.journey_to_date).toLocaleDateString()})` : ''}</div>
-                          <div><strong>Mode:</strong> {row.journey_mode} <br/><strong>Amount:</strong> ₹{row.journey_amount}</div>
+                          <div><strong>From:</strong> {row.journey_from} ➔ <strong>To:</strong> {row.journey_to}</div>
+                          <div><strong>Mode:</strong> {row.journey_mode} · <strong>Amount:</strong> ₹{row.journey_amount}</div>
                         </div>
                       ))}
                     </div>
@@ -880,8 +756,8 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                       <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 border-b pb-1.5 mb-2 font-serif">Local Journey Details</h3>
                       {localJourneyRows.map((row, idx) => (
                         <div key={idx} className="border-b pb-2 mb-2 text-sm grid grid-cols-2 gap-2">
-                          <div><strong>Date:</strong> {row.local_journey_date ? new Date(row.local_journey_date).toLocaleDateString() : '—'} <br/><strong>From:</strong> {row.local_journey_from} ➔ <strong>To:</strong> {row.local_journey_to}</div>
-                          <div><strong>Mode:</strong> {row.local_journey_mode} <br/><strong>Amount:</strong> ₹{row.local_journey_amount}</div>
+                          <div><strong>From:</strong> {row.local_journey_from} ➔ <strong>To:</strong> {row.local_journey_to}</div>
+                          <div><strong>Mode:</strong> {row.local_journey_mode} · <strong>Amount:</strong> ₹{row.local_journey_amount}</div>
                         </div>
                       ))}
                       <div className="pt-2 text-right font-bold text-gray-800">
@@ -1010,18 +886,10 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                         <button type="button" onClick={addJourneyRow} className="text-xs font-bold text-indigo-600 hover:underline">+ Add Row</button>
                       </div>
                       {journeyRows.map((row, index) => (
-                        <div key={index} className="grid grid-cols-1 md:grid-cols-7 gap-3 items-end border-b pb-3 mb-3">
-                          <div className="md:col-span-1 flex flex-col">
-                            <label className="text-[10px] font-bold text-gray-500">From Date</label>
-                            <input type="date" value={row.journey_from_date || ''} onChange={(e) => handleJourneyChange(index, 'journey_from_date', e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
-                          </div>
+                        <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end border-b pb-3 mb-3">
                           <div className="md:col-span-1 flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500">From *</label>
                             <input type="text" value={row.journey_from} onChange={(e) => handleJourneyChange(index, 'journey_from', e.target.value)} required className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
-                          </div>
-                          <div className="md:col-span-1 flex flex-col">
-                            <label className="text-[10px] font-bold text-gray-500">To Date</label>
-                            <input type="date" value={row.journey_to_date || ''} onChange={(e) => handleJourneyChange(index, 'journey_to_date', e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
                           </div>
                           <div className="md:col-span-1 flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500">To *</label>
@@ -1055,11 +923,7 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                         <button type="button" onClick={addLocalJourneyRow} className="text-xs font-bold text-indigo-600 hover:underline">+ Add Row</button>
                       </div>
                       {localJourneyRows.map((row, index) => (
-                        <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end border-b pb-3 mb-3">
-                          <div className="md:col-span-1 flex flex-col">
-                            <label className="text-[10px] font-bold text-gray-500">Date</label>
-                            <input type="date" value={row.local_journey_date || ''} onChange={(e) => handleLocalJourneyChange(index, 'local_journey_date', e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />
-                          </div>
+                        <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end border-b pb-3 mb-3">
                           <div className="md:col-span-1 flex flex-col">
                             <label className="text-[10px] font-bold text-gray-500">From *</label>
                             <input type="text" value={row.local_journey_from} onChange={(e) => handleLocalJourneyChange(index, 'local_journey_from', e.target.value)} required className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-black" />

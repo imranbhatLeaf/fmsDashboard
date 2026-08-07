@@ -518,7 +518,11 @@ export default function Registrar() {
                               {status === "Rejected" && r.rejectedAt && (
                                 <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.rejectedAt)}</div>
                               )}
+<<<<<<< Updated upstream
                               {status === "Approved by Registrar, Pending for Payment" && (r.registrarApprovedAt || r.dateOfApproval) && (
+=======
+                              {(status === "Approved" || status === "Approved by Registrar, Pending for Payment") && (r.registrarApprovedAt || r.dateOfApproval) && (
+>>>>>>> Stashed changes
                                 <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.registrarApprovedAt || r.dateOfApproval)}</div>
                               )}
                               {status === "Pending Registrar Approval" && (r.adminApprovedAt || r.dateOfForwarding) && (
@@ -529,6 +533,7 @@ export default function Registrar() {
                               )}
                             </span>
                           </td>
+
                           <td className="px-2 py-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <button
@@ -549,32 +554,19 @@ export default function Registrar() {
                                     Approve
                                   </button>
                                   <button
-                                  onClick={() => openRejectModal(r._id)}
-                                  className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border transition-colors shadow-sm"
-                                  style={{ color: "#c2410c", borderColor: "#fdba74", background: "#fff" }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.background = "#fff7ed")}
-                                  onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
-                                >
-                                  Reject
-                                </button>
+                                    onClick={() => openRejectModal(r._id)}
+                                    className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border transition-colors shadow-sm"
+                                    style={{ color: "#c2410c", borderColor: "#fdba74", background: "#fff" }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.background = "#fff7ed")}
+                                    onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+                                  >
+                                    Reject
+                                  </button>
+
                                 </>
                               )}
-                              {(status === "Form Pending" || status === "Pending Admin Approval" || status === "Approved") && (
-                                <button
-                                  onClick={() => openRejectModal(r._id)}
-                                  className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border transition-colors shadow-sm"
-                                  style={{ color: "#c2410c", borderColor: "#fdba74", background: "#fff" }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.background = "#fff7ed")}
-                                  onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
-                                >
-                                  Reject
-                                </button>
-                              )}
-                              {status === "Rejected" && r.rejectionReason && (
-                                <span className="text-[9px] italic text-red-500 max-w-[120px] truncate" title={r.rejectionReason}>
-                                  ↳ {r.rejectionReason}
-                                </span>
-                              )}
+
+
                               {/* Req 16: Delete button — limited to Registrar only */}
                               <button
                                 onClick={() => handleDelete(r._id)}

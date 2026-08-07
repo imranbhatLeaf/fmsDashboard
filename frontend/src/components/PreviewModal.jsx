@@ -175,8 +175,11 @@ export default function PreviewModal({ record, onClose }) {
               </div>
             </div>
           )}
+<<<<<<< Updated upstream
 
 
+=======
+>>>>>>> Stashed changes
 
           {/* Rejection Reason (only shown if rejected) */}
           {record.rejected && record.rejectionReason && (

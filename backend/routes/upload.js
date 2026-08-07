@@ -12,7 +12,8 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 async function generateUtrn(component, offset = 0) {
   const comp = (component || "ASSSR").toUpperCase();
-  const shortPrefix = comp.substring(0, 3);
+  const prefixMap = { ASSSR: "ASR", VMI: "VMI", DHC: "DHC", JASSSR: "JAS" };
+  const shortPrefix = prefixMap[comp] || comp.substring(0, 3);
   const year = new Date().getFullYear();
   const prefix = `${shortPrefix}${year}`;
 

@@ -126,8 +126,8 @@ function HonorariumFields({ data, onChange }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Nature of Programme" name="natureOfProgramme" value={data.natureOfProgramme} onChange={onChange} required />
-        <Field label="Title of Programme" name="titleOfProgramme" value={data.titleOfProgramme} onChange={onChange} required />
+      <div><strong>Nature of Programme:</strong> {meta.programme_nature || meta.nature_of_programme || "—"}</div>
+            <div><strong>Title of Programme:</strong> {meta.programme_title || meta.title_of_programme || "—"}</div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <RadioGroup label="Nature of Participation" name="natureOfParticipation" value={data.natureOfParticipation} onChange={onChange} required options={["Expert", "Resource Person"]} />
@@ -309,12 +309,13 @@ function ClaimSummary({ meta }) {
             </div>
             {meta.local_journey_amount > 0 && (
               <div className="sm:col-span-2 border-t pt-1.5">
-                <span className="font-bold text-[10px] uppercase block text-gray-500 mb-0.5">Local Leg</span>
+                <span className="font-bold text-[10px] uppercase block text-gray-500 mb-0.5">Local Journey</span>
                 <div>From {meta.local_journey_from} to {meta.local_journey_to} via {meta.local_journey_mode} (₹ {Number(meta.local_journey_amount).toLocaleString("en-IN")})</div>
               </div>
             )}
-            <div className="sm:col-span-2 font-bold text-sm border-t pt-1.5 mt-1.5">
-              Grand Total: ₹ {Number(meta.grand_total || meta.amount).toLocaleString("en-IN")}
+            <div className="sm:col-span-2 border-t pt-1.5 mt-1.5">
+              <div className="font-bold text-sm">Gross Total: ₹ {Number(meta.grand_total || meta.amount).toLocaleString("en-IN")}</div>
+              <div className="text-sm text-gray-600">Net Amount (after TDS): ₹ {Number(meta.amount_after_tds || meta.amountAfterTds || (meta.amount * 0.9)).toLocaleString("en-IN")}</div>
             </div>
           </div>
         </div>
@@ -400,9 +401,15 @@ export default function FormPage() {
     const pan = formData.pan?.trim();
     const ifsc = formData.bankIfsc?.trim();
 
+<<<<<<< Updated upstream
   const PAN_REGEX = /^[A-Za-z]{6}[0-9]{4}$/;
     if (!pan || !PAN_REGEX.test(pan)) {
       setFormError("PAN Card must be 6 letters followed by 4 numbers.");
+=======
+  const PAN_REGEX = /^[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}$/;
+    if (!pan || !PAN_REGEX.test(pan)) {
+      setFormError("PAN Card must be 5 letters, 4 numbers, then 1 letter (e.g. ABCDE1234F).");
+>>>>>>> Stashed changes
       setSubmitting(false);
       return;
     }

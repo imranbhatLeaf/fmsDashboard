@@ -6,19 +6,30 @@ const { sendEmail } = require("../utils/mailer");
 
 async function generateUtrn(component) {
   const comp = (component || "ASSSR").toUpperCase();
-  const shortPrefix = comp.substring(0, 3);
+  const shortPrefix = {
+    ASSSR: "ASR",
+    VMI: "VMI",
+    DHC: "DHC",
+    JASSSR: "JAS",
+  }[comp] || comp.substring(0, 3);
   const year = new Date().getFullYear();
   const prefix = `${shortPrefix}${year}`;
-  
-  const count = await Record.countDocuments({
-    createdAt: {
-      $gte: new Date(year, 0, 1),
-      $lt: new Date(year + 1, 0, 1)
-    }
-  });
-  
-  const seq = String(count + 1).padStart(3, "0");
-  return `${prefix}${seq}`;
+  let utrn;
+  let attempts = 0;
+  while (attempts < 20) {
+    const count = await Record.countDocuments({
+      createdAt: {
+        $gte: new Date(year, 0, 1),
+        $lt: new Date(year + 1, 0, 1)
+      }
+    });
+    const seq = String(count + 1 + attempts).padStart(3, "0");
+    utrn = `${prefix}${seq}`;
+    const exists = await Record.findOne({ token: utrn });
+    if (!exists) break;
+    attempts++;
+  }
+  return utrn;
 }
 
 // GET /api/records          -> all non-deleted records
@@ -222,6 +233,10 @@ router.post("/", requireAuth, requireRole(["admin"]), async (req, res) => {
       data.localJourneyMode = data.local_journey_mode;
       data.localJourneyAmount = data.local_journey_amount;
       data.grandTotal = data.grand_total;
+      if (data.nature_of_programme) data.programme_nature = data.nature_of_programme;
+      if (data.title_of_programme) data.programme_title = data.title_of_programme;
+      if (data.programme_nature) data.programmeNature = data.programme_nature;
+      if (data.programme_title) data.programmeTitle = data.programme_title;
     }
 
     // ASSSR Honorarium Form normalization & compatibility mapping
@@ -469,7 +484,7 @@ router.put("/:id/process", requireAuth, requireRole(["admin"]), async (req, res)
 
     // Generate receipt number if not already present
     if (!record.receiptNumber) {
-      const prefix = { ASSSR: "A", VMI: "V", DHC: "D", JASSSR: "J" }[record.services] || "X";
+      const prefix = { ASSSR: "ASR", VMI: "VMI", DHC: "DHC", JASSSR: "JAS" }[record.services] || "X";
       const year = new Date().getFullYear();
       const count = await Record.countDocuments({ paymentProcessed: true });
       const seq = String(count + 1).padStart(4, "0");
