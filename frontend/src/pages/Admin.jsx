@@ -41,7 +41,7 @@ export default function AdminDashboard() {
     try {
       const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${auth?.token}`
         },
@@ -237,7 +237,7 @@ export default function AdminDashboard() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || "Failed to save record");
-    
+
     if (isAdd) {
       setRecords((prev) => [data, ...prev]);
     } else {
@@ -258,6 +258,7 @@ export default function AdminDashboard() {
   const fileInputRef = useRef(null);
 
   const [records, setRecords] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [recordsError, setRecordsError] = useState(null);
   const [previewRecord, setPreviewRecord] = useState(null);
@@ -331,7 +332,7 @@ export default function AdminDashboard() {
   }
 
   const navItemClasses = (active) =>
-    `flex items-center gap-2.5 text-left bg-transparent border-none text-sm px-3 py-2 rounded-md cursor-pointer whitespace-nowrap shrink-0 transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 focus-visible:outline-offset-2 ${
+    `flex items-center gap-1.5 text-left bg-transparent border-none text-xs px-2 py-1.5 rounded-md cursor-pointer whitespace-nowrap shrink-0 transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 focus-visible:outline-offset-2 ${
       active
         ? "bg-white/15 text-white font-semibold"
         : "text-white/65 hover:bg-white/10 hover:text-white"
@@ -348,9 +349,26 @@ export default function AdminDashboard() {
     return "Form Pending";
   };
 
+  const filteredRecords = useMemo(() =>
+    records.filter((r) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        (r.name || "").toLowerCase().includes(q) ||
+        (r.utr_rrn_reference_number || "").toLowerCase().includes(q) ||
+        (r.utrRrnReferenceNumber || "").toLowerCase().includes(q) ||
+        (r.email || "").toLowerCase().includes(q) ||
+        (r.category || "").toLowerCase().includes(q) ||
+        (r.services || "").toLowerCase().includes(q) ||
+        (r.bankReferenceNo || "").toLowerCase().includes(q)
+      );
+    }),
+    [records, searchQuery]
+  );
+
   const displayRecords = useMemo(() =>
-    [...records].sort((a, b) => new Date(b.createdAt || b.dateOfEntry || 0) - new Date(a.createdAt || a.dateOfEntry || 0)),
-    [records]
+    [...filteredRecords].sort((a, b) => new Date(b.createdAt || b.dateOfEntry || 0) - new Date(a.createdAt || a.dateOfEntry || 0)),
+    [filteredRecords]
   );
 
   function downloadCSV() {
@@ -388,24 +406,24 @@ export default function AdminDashboard() {
     <div className="flex flex-col min-h-screen font-sans" style={{ background: "#FAF9F6" }}>
       {/* ── Topbar ── */}
       <header
-        className="w-full flex-shrink-0 flex flex-row items-center gap-4 px-6 py-3 shadow-sm"
+        className="w-full flex-shrink-0 flex flex-row items-center gap-2 px-4 py-2 shadow-sm overflow-x-auto scrollbar-none"
         style={{ background: DB, color: "#fff" }}
       >
         {/* Brand */}
-        <div className="flex flex-col gap-0.5 px-2 border-r border-white/15 shrink-0 mr-4 pr-6">
+        <div className="flex flex-col gap-0 px-1 border-r border-white/15 shrink-0 mr-1 pr-2">
           <span className="text-xl font-bold tracking-wide text-white" style={{ fontFamily: "Tahoma, Geneva, sans-serif" }}>AFMS</span>
-          <span className="text-[10px] text-white/50 font-bold">Accounts (Admin) Panel</span>
+          <span className="text-[10px] text-white/50 font-bold hidden lg:block">Accounts (Admin) Panel</span>
         </div>
 
         {/* Nav */}
-        <nav className="flex flex-row items-center gap-2 flex-1 overflow-x-auto scrollbar-none min-w-0">
+        <nav className="flex flex-row items-center gap-1 overflow-x-auto scrollbar-none min-w-0 flex-1">
           <button
             className={navItemClasses(view === "upload")}
             onClick={() => setView("upload")}
           >
             Upload Entry
           </button>
-          
+
           <div className="w-px h-6 bg-white/15 mx-2"></div>
 
           <button
@@ -427,7 +445,7 @@ export default function AdminDashboard() {
 
         {/* Sign-out */}
         <div className="flex flex-row items-center gap-4 border-l border-white/15 pl-6 shrink-0">
-          <span className="text-[10px] text-white/40 hidden md:block">
+          <span className="text-[10px] text-white/40 hidden xl:block">
             Signed in as <span className="text-white/80 font-bold">Accounts (Admin)</span>
           </span>
           <button
@@ -460,7 +478,7 @@ export default function AdminDashboard() {
               <h1 className="font-serif text-2xl font-bold mb-1.5" style={{ color: DB }}>
                 Upload Entry
               </h1>
-              
+
             </header>
 
             {/* Uploader Section */}
@@ -587,6 +605,16 @@ export default function AdminDashboard() {
             )}
 
             {!recordsLoading && !recordsError && records.length > 0 && (
+              <>
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search records..."
+                    className="w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black"
+                  />
+                </div>
                 <div className="w-full bg-white border border-gray-300 overflow-x-hidden">
                   <table className="w-full border-collapse text-left" style={{ fontSize: "13px" }}>
                     <thead>
@@ -608,7 +636,7 @@ export default function AdminDashboard() {
                     <tbody>
                       {displayRecords.map((r) => {
                         const status = getRecordStatus(r);
-                        
+
                         return (
                         <tr
                           key={r._id || r.email}
@@ -627,7 +655,7 @@ export default function AdminDashboard() {
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfUpload || r.dateOfEntry || r.createdAt)}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfForwarding || r.adminApprovedAt)}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-600 whitespace-nowrap">{fmtDate(r.dateOfApproval || r.registrarApprovedAt)}</td>
-          
+
                           <td className="px-0.5 py-1 border-r border-gray-300 text-gray-500 font-mono text-[11px]">{r.paymentProcessed ? (r.bankReferenceNo || "—") : ""}</td>
                           <td className="px-0.5 py-1 border-r border-gray-300">
                             <span
@@ -670,8 +698,8 @@ export default function AdminDashboard() {
                               >
                                 Preview
                               </button>
-                             
-                              
+
+
                               {status === "Approval Pending" && (
                                 <>
                                   <button
@@ -714,6 +742,7 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 </div>
+              </>
             )}
           </section>
         )}
@@ -722,8 +751,8 @@ export default function AdminDashboard() {
 
       {/* Generic Modal for Add/Edit/Preview */}
       {showRecordModal && (
-        <RecordModal 
-          record={activeRecord} 
+        <RecordModal
+          record={activeRecord}
           defaultFormType={initialFormType}
           onClose={() => setShowRecordModal(false)}
           onSave={handleSaveRecord}
