@@ -109,7 +109,7 @@ export default function Registrar() {
     try {
       const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${auth?.token}`
         },
@@ -208,9 +208,29 @@ export default function Registrar() {
   };
 
   // Always show latest first
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredRecords = useMemo(() =>
+    records.filter((r) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        (r.name || "").toLowerCase().includes(q) ||
+        (r.utr_rrn_reference_number || "").toLowerCase().includes(q) ||
+        (r.utrRrnReferenceNumber || "").toLowerCase().includes(q) ||
+        (r.email || "").toLowerCase().includes(q) ||
+        (r.category || "").toLowerCase().includes(q) ||
+        (r.services || "").toLowerCase().includes(q) ||
+        ({ ASSSR: "asiatic society for social science research", VMI: "varahamihira multidisciplinary institute", DHC: "deccan history congress", JASSSR: "journal of asiatic society" }[r.services] || "").includes(q) ||
+        (r.bankReferenceNo || "").toLowerCase().includes(q)
+      );
+    }),
+    [records, searchQuery]
+  );
+
   const sortedRecords = useMemo(() =>
-    [...records].sort((a, b) => new Date(b.createdAt || b.dateOfEntry || 0) - new Date(a.createdAt || a.dateOfEntry || 0)),
-    [records]
+    [...filteredRecords].sort((a, b) => new Date(b.createdAt || b.dateOfEntry || 0) - new Date(a.createdAt || a.dateOfEntry || 0)),
+    [filteredRecords]
   );
 
   const totalAmount = records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
@@ -384,6 +404,16 @@ export default function Registrar() {
               <p className="text-sm" style={{ color: "#aab" }}>No transactions found for this category.</p>
             )}
             {!loading && !error && records.length > 0 && (
+              <>
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search records..."
+                    className="w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black"
+                  />
+                </div>
               <div className="w-full overflow-x-auto bg-white border border-gray-300">
                 <table className="w-full border-collapse text-left whitespace-nowrap" style={{ fontSize: "13px" }}>
                   <thead>
@@ -401,7 +431,7 @@ export default function Registrar() {
                   <tbody>
                     {sortedRecords.map((r) => {
                       const status = getRecordStatus(r);
-                      
+
                       return (
                         <tr
                           key={r._id || r.email}
@@ -502,6 +532,7 @@ export default function Registrar() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </>
         )}
