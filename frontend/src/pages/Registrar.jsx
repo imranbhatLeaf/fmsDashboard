@@ -9,7 +9,7 @@ import PreviewModal from "../components/PreviewModal";
 
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
 
-const COMPONENTS = ["ASSSR", "JASSSR", "DHC", "VMI"];
+const PAYMENT_TYPES = ["Salary", "Honorarium", "Fellowship", "TA/DA", "Refund"];
 
 const DB = "black";
 
@@ -17,7 +17,7 @@ export default function Registrar() {
   const { auth, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [activeCategory, setActiveCategory] = useState("all");
+  const [activePaymentType, setActivePaymentType] = useState("all");
   const [records, setRecords]               = useState([]);
   const [loading, setLoading]               = useState(false);
   const [error, setError]                   = useState(null);
@@ -32,7 +32,7 @@ export default function Registrar() {
     setLoading(true);
     setError(null);
     try {
-      const query = activeCategory === "all" ? "?adminApproved=true" : `?adminApproved=true&component=${encodeURIComponent(activeCategory)}`;
+      const query = activePaymentType === "all" ? "?adminApproved=true" : `?adminApproved=true&category=${encodeURIComponent(activePaymentType)}`;
       const res = await fetch(`${API_BASE}/api/records${query}`, {
         headers: { Authorization: `Bearer ${auth?.token}` }
       });
@@ -51,7 +51,7 @@ export default function Registrar() {
     } finally {
       setLoading(false);
     }
-  }, [activeCategory, auth?.token]);
+  }, [activePaymentType, auth?.token]);
 
   useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
@@ -269,32 +269,32 @@ export default function Registrar() {
 
 
 
-        {/* Category filter tabs + Recycle Bin toggle */}
+        {/* Payment Type filter tabs + Recycle Bin toggle */}
         <div className="flex gap-2 flex-wrap mb-5 items-center">
-          {["all", ...COMPONENTS].map((cat) => (
+          {["all", ...PAYMENT_TYPES].map((pt) => (
             <button
-              key={cat}
-              onClick={() => { setActiveCategory(cat); setShowRecycleBin(false); }}
+              key={pt}
+              onClick={() => { setActivePaymentType(pt); setShowRecycleBin(false); }}
               className="text-xs font-semibold px-4 py-1.5 rounded-full border transition-colors"
               style={
-                activeCategory === cat && !showRecycleBin
+                activePaymentType === pt && !showRecycleBin
                   ? { background: DB, color: "#fff", borderColor: DB }
                   : { background: "#fff", color: "#556", borderColor: "#dde3ec" }
               }
               onMouseEnter={(e) => {
-                if (activeCategory !== cat || showRecycleBin) {
+                if (activePaymentType !== pt || showRecycleBin) {
                   e.currentTarget.style.borderColor = "#9aaac8";
                   e.currentTarget.style.color = DB;
                 }
               }}
               onMouseLeave={(e) => {
-                if (activeCategory !== cat || showRecycleBin) {
+                if (activePaymentType !== pt || showRecycleBin) {
                   e.currentTarget.style.borderColor = "#dde3ec";
                   e.currentTarget.style.color = "#556";
                 }
               }}
             >
-              {cat === "all" ? "All" : cat}
+              {pt === "all" ? "All" : pt}
             </button>
           ))}
           <div className="w-px h-6 bg-gray-300 mx-1"></div>
