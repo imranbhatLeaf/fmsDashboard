@@ -43,10 +43,10 @@ export default function Track() {
           <img src={logo} alt="Logo" className="h-14 object-contain" />
         </div>
         <h1 className="text-center text-lg font-bold uppercase tracking-widest text-black mb-1">
-          Track Your Application
+          Know your Payment
         </h1>
         <p className="text-center text-xs text-gray-500 mb-6">
-          Enter your UTRN to view your form status
+          Enter UTRN to show the status of transaction.
         </p>
         <form onSubmit={handleTrack} className="flex flex-col gap-4">
           <input

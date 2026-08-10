@@ -41,17 +41,37 @@ export default function Home() {
       className="min-h-screen bg-gray-50 text-gray-900 flex flex-col justify-between selection:bg-black selection:text-white"
       style={{ fontFamily: 'Tahoma, Geneva, sans-serif' }}
     >
-      {/* Header Banner */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-center">
+      {/* Logo Banner */}
+      <div className="bg-white">
+        <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col items-center text-center gap-4">
           <img src={headerImg} alt="AFMS Header" className="w-full max-h-24 object-contain" />
+          <div className="flex flex-col items-center">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900" style={{ fontFamily: 'Tahoma, Geneva, sans-serif' }}>
+              Asiatic Society for Social Science Research
+            </h1>
+            <h2 className="text-lg md:text-xl font-semibold text-gray-700 mt-2" style={{ fontFamily: 'Tahoma, Geneva, sans-serif' }}>
+              Finance Management System (AFMS)
+            </h2>
+          </div>
+        </div>
+      </div>
+
+      {/* Nav Bar */}
+      <div className="sticky top-0 z-50 bg-gray-100 shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex justify-end">
+          <button
+            onClick={handleLoginNavigation}
+            className="px-6 py-2 bg-black text-white text-sm font-semibold rounded-md hover:bg-gray-800 transition-colors uppercase tracking-wider shadow-sm"
+          >
+            Login
+          </button>
         </div>
       </div>
 
       {/* Hero Section */}
-      <section className="max-w-7xl mx-auto w-full px-6 py-12 flex flex-col lg:flex-row gap-12 items-start">
+      <section className="max-w-7xl mx-auto w-full px-6 py-12 flex flex-col lg:flex-row gap-12 items-stretch">
         {/* Left Side: About */}
-        <div className="lg:w-2/3 flex flex-col gap-5">
+        <div className="lg:w-1/2 flex flex-col gap-5">
           <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight text-gray-900 border-b-2 border-black pb-3 inline-block w-fit">
             Know About AFMS?
           </h1>
@@ -66,40 +86,34 @@ export default function Home() {
               The system enables end-to-end digital processing of payments and receipts, ensuring greater efficiency, transparency, accountability, and real-time visibility of financial transactions. It supports effective cash and fund management through the “Just-in-Time” transfer of funds, while enabling complete tracking of funds from their release through their eventual credit to the designated beneficiary’s bank account.
             </p>
             <p>
-              A key feature of PFMS is the Unified Tracking Reference Number (UTRN), which provides a unique reference for each financial transaction. The UTRN enables users and authorised officials to track the status and movement of payments, verify transaction details, and monitor the progress of a payment from initiation to successful settlement.
+              A key feature of AFMS is the Unified Tracking Reference Number (UTRN), which provides a unique reference for each financial transaction. The UTRN enables users and authorised officials to track the status and movement of payments, verify transaction details, and monitor the progress of a payment from initiation to successful settlement.
             </p>
             <p>
-              Through these integrated capabilities, PFMS provides a robust digital infrastructure for financial control, accountability, transparency, and evidence-based financial management, while strengthening the overall efficiency of institutional financial operations.
+              Through these integrated capabilities, AFMS provides a robust digital infrastructure for financial control, accountability, transparency, and evidence-based financial management, while strengthening the overall efficiency of institutional financial operations.
             </p>
           </div>
         </div>
 
         {/* Right Side: Action Buttons */}
-        <div className="lg:w-1/3 flex flex-col gap-6 w-full lg:sticky lg:top-12 mt-8 lg:mt-0">
-          <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 flex flex-col gap-5">
-            <h3 className="text-lg font-semibold text-gray-900 text-center uppercase tracking-wide">Quick Actions</h3>
+        <div className="lg:w-1/2 flex flex-col justify-center w-full mt-8 lg:mt-0 h-full">
+          <div className="bg-white p-8 py-10 rounded-xl shadow-lg border border-gray-200 flex flex-col justify-center items-center gap-8">
+            <h3 className="text-2xl font-bold text-gray-900 text-center uppercase tracking-wider">PAYMENT STATUS</h3>
+            
+            <div className="text-black opacity-80">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.2} stroke="currentColor" className="w-28 h-28">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" />
+              </svg>
+            </div>
             
             <button
               onClick={handleTrackNavigation}
               className="group relative w-full flex justify-center py-3 px-4 border border-black text-sm font-semibold rounded-md text-black bg-white hover:bg-black hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-all duration-300 uppercase tracking-widest"
             >
               <span className="relative z-10 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10.496 2.132a1 1 0 00-.992 0l-7 4A1 1 0 003 8v7a1 1 0 100 2h14a1 1 0 100-2V8a1 1 0 00.5-1.868l-7-4zM6 9a1 1 0 00-1 1v3a1 1 0 102 0v-3a1 1 0 00-1-1zm3 1a1 1 0 012 0v3a1 1 0 11-2 0v-3zm5-1a1 1 0 00-1 1v3a1 1 0 102 0v-3a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
-                Track Status
-              </span>
-            </button>
-
-            <button
-              onClick={handleLoginNavigation}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-md text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-all duration-300 uppercase tracking-widest shadow-md hover:shadow-lg"
-            >
-              <span className="relative z-10 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L6.414 9H17a1 1 0 110 2H6.414l4.293 4.293a1 1 0 01-1.414 1.414l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                Portal Login
+                KNOW YOUR PAYMENTS
               </span>
             </button>
           </div>
