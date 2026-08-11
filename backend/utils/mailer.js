@@ -22,7 +22,7 @@ function getSubject(doc, stage = 1) {
   if (stage === 1) {
     return `Submission of Bank Account Details for Processing of Payment against ${paymentType} -- reg.`;
   } else if (stage === 2) {
-    return `Unique Transfer Reference Number (UTRN) for Tracking of ${paymentType} -- reg.`;
+    return `Unique Tracking Reference Number (UTRN) for Tracking of ${paymentType} -- reg.`;
   } else if (stage === 3) {
     return `Payment Advice Number & UTRN and Transaction Date in respect of release ${paymentType} -- reg.`;
   } else if (stage === 4) {
@@ -37,7 +37,7 @@ function getHtmlSubject(doc, stage = 1) {
   if (stage === 1) {
     return `Submission of Bank Account Details for Processing of Payment against ${paymentType} -- reg.`;
   } else if (stage === 2) {
-    return `Unique Transfer Reference Number (UTRN) for Tracking of ${paymentType} -- reg.`;
+    return `Unique Tracking Reference Number (UTRN) for Tracking of ${paymentType} -- reg.`;
   } else if (stage === 3) {
     return `Payment Advice Number & UTRN and Transaction Date in respect of release ${paymentType} -- reg.`;
   } else if (stage === 4) {
@@ -55,9 +55,9 @@ function getBody(doc, stage = 1) {
   
   let content = "";
   if (stage === 1) {
-    content = `We are pleased to inform you that the ${paymentType} portal is open via ARMS for submission of bank account details for processing of your payment.
+    content = `We are pleased to inform you that the ${paymentType} portal is open via AFMS for submission of bank account details for processing of your payment.
 
-Please use the secure link below to submit your details. This link is valid for 45 days only. Upon submission, a Unique Transfer Reference Number (UTRN) will be generated for your tracking.
+Please use the secure link below to submit your details. This link is valid for 45 days only. Upon submission, a Unique Tracking Reference Number (UTRN) will be generated for your tracking.
 
 Link: ${formLink}
 
@@ -68,7 +68,7 @@ Important Points:
   } else if (stage === 2) {
     content = `This is to confirm that your bank details for ${paymentType} have been successfully submitted via the AFMS portal.
 
-Your Unique Transfer Reference Number (UTRN) for tracking this transaction is: ${utrn}.
+Your Unique Tracking Reference Number (UTRN) for tracking this transaction is: ${utrn}.
 
 You can track the status of your payment using the following link: ${formLink}
 
@@ -132,10 +132,10 @@ function getHtmlBody(doc, subject, stage = 1) {
   if (stage === 1) {
     mainContentHtml = `
       <p style="font-size: 14px; line-height: 1.6; margin-bottom: 20px; color: #374151;">
-        We are pleased to inform you that the ${paymentType} portal is open via ARMS for submission of bank account details for processing of your payment.
+        We are pleased to inform you that the ${paymentType} portal is open via AFMS for submission of bank account details for processing of your payment.
       </p>
       <p style="font-size: 14px; line-height: 1.6; margin-bottom: 20px; color: #374151;">
-        Please use the secure link below to submit your details. This link is valid for <strong>45 days</strong> only. Upon submission, a Unique Transfer Reference Number (UTRN) will be generated for your tracking.
+        Please use the secure link below to submit your details. This link is valid for <strong>45 days</strong> only. Upon submission, a Unique Tracking Reference Number (UTRN) will be generated for your tracking.
       </p>
       <p style="font-size: 14px; line-height: 1.6; margin-bottom: 20px; color: #374151;">
         Link: ${underlinedLink}
@@ -155,7 +155,7 @@ function getHtmlBody(doc, subject, stage = 1) {
         This is to confirm that your bank details for ${paymentType} have been successfully submitted via the AFMS portal.
       </p>
       <p style="font-size: 14px; line-height: 1.6; margin-bottom: 20px; color: #374151;">
-        Your Unique Transfer Reference Number (UTRN) for tracking this transaction is: <strong>${utrn}</strong>.
+        Your Unique Tracking Reference Number (UTRN) for tracking this transaction is: <strong>${utrn}</strong>.
       </p>
       <p style="font-size: 14px; line-height: 1.6; margin-bottom: 20px; color: #374151;">
         You can track the status of your payment using the following link: ${underlinedLink}
