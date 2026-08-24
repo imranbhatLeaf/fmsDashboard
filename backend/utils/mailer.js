@@ -293,28 +293,51 @@ async function sendEmail(doc, stage = 1) {
 
   // Use Resend HTTP API (port 443 — works on all VPS without SMTP port restrictions)
   // Logo is served from a hosted URL to avoid base64 bloat that causes Gmail clipping (102KB limit)
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [doc.email],
+        subject,
+        text,
+        html,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || `Resend API error: ${response.status}`);
+    }
+
+    return { messageId: result.id };
+  } catch (fetchErr) {
+    console.warn(`[EMAIL] Resend API fetch failed (${fetchErr.message}). Attempting SMTP fallback...`);
+    
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.resend.com",
+      port: parseInt(process.env.SMTP_PORT) || 465,
+      secure: process.env.SMTP_SECURE === "false" ? false : true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS || apiKey,
+      },
+    });
+
+    const info = await transporter.sendMail({
       from,
-      to: [doc.email],
+      to: doc.email,
       subject,
       text,
       html,
-    }),
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.message || `Resend API error: ${response.status}`);
+    });
+    return { messageId: info.messageId };
   }
-
-  return { messageId: result.id };
 }
 
 module.exports = { sendEmail };

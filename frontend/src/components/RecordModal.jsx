@@ -83,7 +83,7 @@ const SALARY_FIELDS_SPEC = {
   payeeInfo: [
     { label: "Payee", name: "name", required: true, type: "text" },
     { label: "Designation", name: "designation", required: true, type: "text" },
-    { label: "Pay Level", name: "pay_level", required: true, type: "select", options: ["Level 11", "Level 10", "Level 8 & 9", "Level 7", "Level 6", "Level 4 & 5", "Level 2 & 3"] },
+    { label: "Pay Level", name: "pay_level", required: true, type: "select", options: ["Level 11", "Level 10", "Level 8 & 9", "Level 7", "Level 6", "Level 4 & 5", "Level 2 & 3", "Level 1"] },
     { label: "Address", name: "address", required: true, type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
   ],
@@ -98,7 +98,7 @@ const TADA_FIELDS_SPEC = {
   payeeInfo: [
     { label: "Payee", name: "name", required: true, type: "text" },
     { label: "Designation", name: "designation", required: true, type: "text" },
-    { label: "Pay Level", name: "pay_level", required: true, type: "select", options: ["Level 11", "Level 10", "Level 8 & 9", "Level 7", "Level 6", "Level 4 & 5", "Level 2 & 3"] },
+    { label: "Pay Level", name: "pay_level", required: true, type: "select", options: ["Level 11", "Level 10", "Level 8 & 9", "Level 7", "Level 6", "Level 4 & 5", "Level 2 & 3", "Level 1"] },
     { label: "Address", name: "address", required: true, type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
   ],
@@ -127,7 +127,7 @@ const HONORARIUM_FIELDS_SPEC = {
   payeeInfo: [
     { label: "Payee", name: "name", required: true, type: "text" },
     { label: "Designation", name: "designation", required: true, type: "text" },
-    { label: "Pay Level", name: "pay_level", required: true, type: "select", options: ["Level 11", "Level 10", "Level 8 & 9", "Level 7", "Level 6", "Level 4 & 5", "Level 2 & 3"] },
+    { label: "Pay Level", name: "pay_level", required: true, type: "select", options: ["Level 11", "Level 10", "Level 8 & 9", "Level 7", "Level 6", "Level 4 & 5", "Level 2 & 3", "Level 1"] },
     { label: "Address", name: "address", required: true, type: "text" },
     { label: "Email", name: "email", required: true, type: "email" },
   ],
