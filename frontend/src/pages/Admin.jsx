@@ -341,6 +341,7 @@ export default function AdminDashboard() {
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN") : "—";
 
   const getRecordStatus = (r) => {
+    if (r.kycFailed) return "KYC Failed";
     if (r.rejected) return "Rejected";
     if (r.paymentProcessed) return "Paid";
     if (r.registrarApproved) return "Approved by Registrar, Pending for Payment";
@@ -663,7 +664,7 @@ export default function AdminDashboard() {
                               style={
                                 status === "Paid"
                                   ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
-                                  : status === "Rejected"
+                                  : status === "Rejected" || status === "KYC Failed"
                                   ? { background: "#fef2f2", color: "#dc2626", borderColor: "#fca5a5" }
                                   : status === "Approved by Registrar, Pending for Payment" || status === "Approval Pending"
                                   ? { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
@@ -989,3 +990,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+

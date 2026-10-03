@@ -351,6 +351,27 @@ export default function FormPage() {
   const [formError, setFormError] = useState(null);
   const [formData, setFormData] = useState({});
 
+  // ── KYC State ──────────────────────────────────────────────────────────────
+  // Step 1: Aadhaar OTP
+  const [aadhaar, setAadhaar] = useState("");
+  const [aadhaarRefId, setAadhaarRefId] = useState(null);
+  const [aadhaarOtp, setAadhaarOtp] = useState("");
+  const [aadhaarName, setAadhaarName] = useState(null);   // name returned from OKYC
+  const [aadhaarVerified, setAadhaarVerified] = useState(false);
+  const [aadhaarStep, setAadhaarStep] = useState("input"); // "input" | "otp" | "done"
+  const [aadhaarLoading, setAadhaarLoading] = useState(false);
+  const [aadhaarError, setAadhaarError] = useState(null);
+
+  // Step 2: PAN
+  const [panVerified, setPanVerified] = useState(false);
+  const [panName, setPanName] = useState(null);
+  const [panLoading, setPanLoading] = useState(false);
+  const [panError, setPanError] = useState(null);
+  const [nameMatchOk, setNameMatchOk] = useState(null);  // null | true | false
+
+  // KYC fully passed = both verified + names match
+  const kycPassed = aadhaarVerified && panVerified && nameMatchOk === true;
+
   useEffect(() => {
     async function fetchMeta() {
       try {
@@ -392,13 +413,109 @@ export default function FormPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   }
 
+  // ── KYC Handlers ───────────────────────────────────────────────────────────
+
+  async function handleAadhaarGenerateOtp() {
+    setAadhaarError(null);
+    if (!/^\d{12}$/.test(aadhaar.trim())) {
+      setAadhaarError("Please enter a valid 12-digit Aadhaar number.");
+      return;
+    }
+    setAadhaarLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/verify/aadhaar/generate-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aadhaar: aadhaar.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to send OTP.");
+      setAadhaarRefId(data.ref_id);
+      setAadhaarStep("otp");
+    } catch (err) {
+      setAadhaarError(err.message);
+    } finally {
+      setAadhaarLoading(false);
+    }
+  }
+
+  async function handleAadhaarVerifyOtp() {
+    setAadhaarError(null);
+    if (!/^\d{6}$/.test(aadhaarOtp.trim())) {
+      setAadhaarError("OTP must be exactly 6 digits.");
+      return;
+    }
+    setAadhaarLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/verify/aadhaar/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ref_id: aadhaarRefId, otp: aadhaarOtp.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "OTP verification failed.");
+      setAadhaarName(data.aadhaar_name);
+      setAadhaarVerified(true);
+      setAadhaarStep("done");
+      // Auto-fill beneficiary name from Aadhaar name
+      setFormData((prev) => ({ ...prev, bankBeneficiaryName: data.aadhaar_name }));
+    } catch (err) {
+      setAadhaarError(err.message);
+    } finally {
+      setAadhaarLoading(false);
+    }
+  }
+
+  async function handlePanVerify() {
+    setPanError(null);
+    setNameMatchOk(null);
+    const pan = formData.pan?.trim();
+    const PAN_REGEX = /^[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}$/;
+    if (!pan || !PAN_REGEX.test(pan)) {
+      setPanError("Please enter a valid PAN (e.g. ABCDE1234F).");
+      return;
+    }
+    if (!aadhaarVerified) {
+      setPanError("Please complete Aadhaar verification first.");
+      return;
+    }
+    setPanLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/verify/pan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pan, aadhaar_name: aadhaarName, token }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "PAN verification failed.");
+      setPanName(data.pan_name);
+      setPanVerified(true);
+      setNameMatchOk(data.name_match);
+      if (data.name_match === false) {
+        setPanError(data.name_match_message);
+      }
+    } catch (err) {
+      setPanError(err.message);
+    } finally {
+      setPanLoading(false);
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
     setFormError(null);
 
+    // KYC gate — must pass before submission
+    if (!kycPassed) {
+      setFormError("Please complete Aadhaar and PAN verification before submitting.");
+      setSubmitting(false);
+      return;
+    }
+
     // Validate PAN/IFSC client-side
     const pan = formData.pan?.trim();
+
     const ifsc = formData.bankIfsc?.trim();
 
   const PAN_REGEX = /^[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}$/;
@@ -566,7 +683,178 @@ export default function FormPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="bg-white rounded-lg p-4 md:p-6 space-y-5 shadow-sm">
-          {/* Personal Details */}
+
+          {/* ── KYC Verification Section ─────────────────────────────────── */}
+          <div>
+            <h2 className="text-xs uppercase tracking-wider text-black font-bold mb-1 pb-1 border-b border-gray-100">
+              Identity Verification (KYC)
+            </h2>
+            <p className="text-[11px] text-gray-500 mb-4">
+              You must verify your Aadhaar and PAN before submitting. Your name must match across both documents.
+            </p>
+
+            {/* ── Step 1: Aadhaar OTP ───────────────────────────────────── */}
+            <div className={`border rounded-lg p-4 mb-3 ${aadhaarVerified ? "border-green-300 bg-green-50" : "border-gray-200 bg-gray-50"}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${aadhaarVerified ? "bg-green-600 text-white" : "bg-black text-white"}`}>
+                  {aadhaarVerified ? "✓" : "1"}
+                </span>
+                <span className="text-xs font-bold text-black">Aadhaar Verification (OKYC)</span>
+                {aadhaarVerified && (
+                  <span className="ml-auto text-[11px] font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                    Verified — {aadhaarName}
+                  </span>
+                )}
+              </div>
+
+              {aadhaarStep === "input" && !aadhaarVerified && (
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <label className="text-[11px] font-bold text-gray-600 block mb-1">Aadhaar Number *</label>
+                    <input
+                      type="text"
+                      value={aadhaar}
+                      onChange={(e) => setAadhaar(e.target.value.replace(/\D/g, "").slice(0, 12))}
+                      placeholder="12-digit Aadhaar number"
+                      maxLength={12}
+                      onPaste={(e) => e.preventDefault()}
+                      onCopy={(e) => e.preventDefault()}
+                      autoComplete="off"
+                      className="w-full border-b-2 border-gray-200 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black transition-colors tracking-widest"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAadhaarGenerateOtp}
+                    disabled={aadhaarLoading || aadhaar.length !== 12}
+                    className="bg-black text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                  >
+                    {aadhaarLoading ? "Sending…" : "Send OTP"}
+                  </button>
+                </div>
+              )}
+
+              {aadhaarStep === "otp" && !aadhaarVerified && (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-gray-600 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+                    📱 An OTP has been sent to your Aadhaar-registered mobile number.
+                  </p>
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <label className="text-[11px] font-bold text-gray-600 block mb-1">Enter OTP *</label>
+                      <input
+                        type="text"
+                        value={aadhaarOtp}
+                        onChange={(e) => setAadhaarOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        placeholder="6-digit OTP"
+                        maxLength={6}
+                        onPaste={(e) => e.preventDefault()}
+                        autoComplete="off"
+                        className="w-full border-b-2 border-gray-200 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black transition-colors tracking-widest"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAadhaarVerifyOtp}
+                      disabled={aadhaarLoading || aadhaarOtp.length !== 6}
+                      className="bg-black text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                    >
+                      {aadhaarLoading ? "Verifying…" : "Verify OTP"}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setAadhaarStep("input"); setAadhaarOtp(""); setAadhaarRefId(null); }}
+                    className="text-[11px] text-gray-500 underline cursor-pointer"
+                  >
+                    ← Change Aadhaar number
+                  </button>
+                </div>
+              )}
+
+              {aadhaarError && (
+                <p className="text-red-600 text-xs mt-2 bg-red-50 border border-red-200 rounded px-3 py-1.5">⚠ {aadhaarError}</p>
+              )}
+            </div>
+
+            {/* ── Step 2: PAN Verification ──────────────────────────────── */}
+            <div className={`border rounded-lg p-4 ${panVerified ? (nameMatchOk ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50") : "border-gray-200 bg-gray-50"}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${panVerified && nameMatchOk ? "bg-green-600 text-white" : panVerified && !nameMatchOk ? "bg-red-600 text-white" : "bg-gray-400 text-white"}`}>
+                  {panVerified && nameMatchOk ? "✓" : panVerified && !nameMatchOk ? "✗" : "2"}
+                </span>
+                <span className="text-xs font-bold text-black">PAN Verification</span>
+                {panVerified && nameMatchOk && (
+                  <span className="ml-auto text-[11px] font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                    Verified — {panName}
+                  </span>
+                )}
+              </div>
+
+              {!aadhaarVerified ? (
+                <p className="text-[11px] text-gray-400 italic">Complete Aadhaar verification first.</p>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <label className="text-[11px] font-bold text-gray-600 block mb-1">PAN Number *</label>
+                      <input
+                        type="text"
+                        name="pan"
+                        value={formData.pan || ""}
+                        onChange={(e) => {
+                          handleChange({ target: { name: "pan", value: e.target.value.toUpperCase() } });
+                          setPanVerified(false);
+                          setNameMatchOk(null);
+                          setPanName(null);
+                          setPanError(null);
+                        }}
+                        placeholder="e.g. ABCDE1234F"
+                        maxLength={10}
+                        onPaste={(e) => e.preventDefault()}
+                        onCopy={(e) => e.preventDefault()}
+                        autoComplete="off"
+                        className="w-full border-b-2 border-gray-200 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black transition-colors tracking-widest uppercase"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handlePanVerify}
+                      disabled={panLoading || !formData.pan || formData.pan.length !== 10 || panVerified}
+                      className="bg-black text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                    >
+                      {panLoading ? "Verifying…" : panVerified && nameMatchOk ? "Verified ✓" : "Verify PAN"}
+                    </button>
+                  </div>
+
+                  {panVerified && nameMatchOk && (
+                    <p className="text-green-700 text-xs bg-green-50 border border-green-200 rounded px-3 py-1.5">
+                      ✓ Name match confirmed: Aadhaar name matches PAN name.
+                    </p>
+                  )}
+
+                  {panError && (
+                    <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded px-3 py-1.5">
+                      ⚠ {panError}
+                      {nameMatchOk === false && (
+                        <span className="block mt-1 font-semibold">Form submission is blocked. Please use matching documents.</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* KYC Status Banner */}
+            {kycPassed && (
+              <div className="mt-3 bg-green-600 text-white text-xs font-bold text-center py-2 rounded-lg">
+                ✓ KYC Verified — You may now fill your details and submit.
+              </div>
+            )}
+          </div>
+
+          {/* ── Personal Details (shown only after KYC passes) ────────────── */}
+          {kycPassed && (
           <div>
             <h2 className="text-xs uppercase tracking-wider text-black font-bold mb-3 pb-1 border-b border-gray-100">
               Payee Credentials
@@ -577,16 +865,18 @@ export default function FormPage() {
               showDesignation={meta.form_type !== "refund" && meta.category !== "Refund"}
             />
           </div>
+          )}
 
-          {/* Bank Details */}
+
+          {/* Bank Details — shown only after KYC passes */}
+          {kycPassed && (
           <div>
             <h2 className="text-xs uppercase tracking-wider text-black font-bold mb-3 pb-1 border-b border-gray-100">
               Bank Account Details
             </h2>
             <BankDetails data={formData} onChange={handleChange} />
           </div>
-             {/* TA/DA Fields */}
-         
+          )}
 
           {formError && (
             <p className="text-red-600 text-sm border-l-4 border-red-600 p-3 bg-red-50">{formError}</p>
@@ -594,12 +884,13 @@ export default function FormPage() {
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !kycPassed}
             className="w-full bg-black text-white text-sm font-bold py-3 rounded-lg cursor-pointer transition-colors hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
           >
-            {submitting ? "Submitting…" : "Submit Verification & Bank Details"}
+            {submitting ? "Submitting…" : !kycPassed ? "Complete KYC to Submit" : "Submit Verification & Bank Details"}
           </button>
         </form>
+
 
         <p className="text-center text-xs text-gray-500 mt-6">
           This form was sent to you by {SERVICE_LABELS[services]}. For queries, contact the accounts section.

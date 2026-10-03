@@ -8,6 +8,7 @@ const recordsRouter = require("./routes/records");
 const uploadRouter = require("./routes/upload");
 const formRouter = require("./routes/form");
 const authRouter = require("./routes/auth");
+const verifyRouter = require("./routes/verify");
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/records", recordsRouter);
 app.use("/api/upload", uploadRouter);
 app.use("/api/form", formRouter);
+app.use("/api/verify", verifyRouter);
 
 // Diagnostic endpoint — test SMTP config live on the server
 app.get("/api/test-email", async (req, res) => {
