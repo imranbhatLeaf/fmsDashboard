@@ -12,12 +12,12 @@ function BankDetails({ data, onChange }) {
         Bank Account Details (all fields mandatory)
       </legend>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-        <Field label="Account Beneficiary Name" name="bankBeneficiaryName" value={data.bankBeneficiaryName} onChange={onChange} required />
+        <Field label="Account Beneficiary Name" name="bankBeneficiaryName" value={data.bankBeneficiaryName} onChange={onChange} required disabled />
         <Field label="Bank Name" name="bankName" value={data.bankName} onChange={onChange} required />
-        <Field label="Account Number" name="bankAccountNumber" value={data.bankAccountNumber} onChange={onChange} required />
-        <Field label="Confirm Account Number" name="bankAccountNumberConfirm" value={data.bankAccountNumberConfirm} onChange={onChange} required />
-        <Field label="IFSC Code" name="bankIfsc" value={data.bankIfsc} onChange={onChange} required />
-        <Field label="Confirm IFSC Code" name="bankIfscConfirm" value={data.bankIfscConfirm} onChange={onChange} required />
+        <Field label="Account Number" name="bankAccountNumber" value={data.bankAccountNumber} onChange={onChange} required disabled />
+        <Field label="Confirm Account Number" name="bankAccountNumberConfirm" value={data.bankAccountNumberConfirm} onChange={onChange} required disabled />
+        <Field label="IFSC Code" name="bankIfsc" value={data.bankIfsc} onChange={onChange} required disabled />
+        <Field label="Confirm IFSC Code" name="bankIfscConfirm" value={data.bankIfscConfirm} onChange={onChange} required disabled />
         <div className="md:col-span-2">
           <Field label="Bank Branch Address" name="bankBranchAddress" value={data.bankBranchAddress} onChange={onChange} required />
         </div>
@@ -39,8 +39,8 @@ function PersonalDetails({ data, onChange, showDesignation = true }) {
       </div>
       <Field label="Mobile" name="mobile" value={data.mobile} onChange={onChange} required />
       <Field label="Email" name="email" value={data.email} onChange={onChange} required disabled type="email" />
-      <Field label="PAN Card" name="pan" value={data.pan} onChange={onChange} required />
-      <Field label="Confirm PAN Card" name="panConfirm" value={data.panConfirm} onChange={onChange} required />
+      <Field label="PAN Card" name="pan" value={data.pan} onChange={onChange} required disabled />
+      <Field label="Confirm PAN Card" name="panConfirm" value={data.panConfirm} onChange={onChange} required disabled />
     </div>
   );
 }
@@ -352,7 +352,7 @@ export default function FormPage() {
   const [formData, setFormData] = useState({});
 
   // ── KYC State ──────────────────────────────────────────────────────────────
-  // Step 1: Aadhaar OTP
+  // Step 1: Aadhaar OTP (OKYC)
   const [aadhaar, setAadhaar] = useState("");
   const [aadhaarRefId, setAadhaarRefId] = useState(null);
   const [aadhaarOtp, setAadhaarOtp] = useState("");
@@ -367,10 +367,18 @@ export default function FormPage() {
   const [panName, setPanName] = useState(null);
   const [panLoading, setPanLoading] = useState(false);
   const [panError, setPanError] = useState(null);
-  const [nameMatchOk, setNameMatchOk] = useState(null);  // null | true | false
+  const [nameMatchOk, setNameMatchOk] = useState(null);      // Aadhaar↔PAN match: null|true|false
+  const [nameMatchScore, setNameMatchScore] = useState(null); // Aadhaar↔PAN similarity %
 
-  // KYC fully passed = both verified + names match
-  const kycPassed = aadhaarVerified && panVerified && nameMatchOk === true;
+  // Step 3: Bank Account Verification
+  const [bankVerified, setBankVerified] = useState(false);
+  const [bankName, setBankName] = useState(null);
+  const [bankLoading, setBankLoading] = useState(false);
+  const [bankError, setBankError] = useState(null);
+  const [bankMatchResult, setBankMatchResult] = useState(null); // best-2-of-3 result
+
+  // KYC fully passed = all 3 verified + best-2-of-3 name match passed
+  const kycPassed = aadhaarVerified && panVerified && nameMatchOk === true && bankVerified && bankMatchResult?.passed === true;
 
   useEffect(() => {
     async function fetchMeta() {
@@ -391,7 +399,7 @@ export default function FormPage() {
           mobile: data.phone_mobile,
           pan: "",
           panConfirm: "",
-          bankBeneficiaryName: "",
+          bankBeneficiaryName: data.kyc_aadhaar_name || "",
           bankAccountNumber: "",
           bankAccountNumberConfirm: "",
           bankName: "",
@@ -399,6 +407,36 @@ export default function FormPage() {
           bankIfscConfirm: "",
           bankBranchAddress: ""
         });
+        
+        // Restore KYC state if verified
+        if (data.kyc_aadhaar_verified) {
+          setAadhaarVerified(true);
+          setAadhaarName(data.kyc_aadhaar_name);
+          setAadhaarStep("done");
+        } else if (data.kyc_aadhaar_ref_id) {
+          // If they generated an OTP but refreshed before verifying
+          setAadhaarRefId(data.kyc_aadhaar_ref_id);
+          setAadhaarStep("otp");
+        }
+        if (data.kyc_pan_verified) {
+          setPanVerified(true);
+          setPanName(data.kyc_pan_name);
+          setNameMatchScore(data.kyc_pan_match_score);
+          setNameMatchOk(data.kyc_pan_match_score !== null ? data.kyc_pan_match_score >= 60 : null);
+          setFormData(prev => ({ ...prev, pan: data.kyc_pan_number || "", panConfirm: data.kyc_pan_number || "" }));
+        }
+        if (data.kyc_bank_verified) {
+          setBankVerified(true);
+          setBankName(data.kyc_bank_name);
+          setBankMatchResult(data.kyc_bank_match);
+          setFormData(prev => ({ 
+            ...prev, 
+            bankAccountNumber: data.kyc_bank_account || "", 
+            bankAccountNumberConfirm: data.kyc_bank_account || "",
+            bankIfsc: data.kyc_bank_ifsc || "",
+            bankIfscConfirm: data.kyc_bank_ifsc || ""
+          }));
+        }
       } catch {
         setError("network");
       } finally {
@@ -426,7 +464,7 @@ export default function FormPage() {
       const res = await fetch(`${API_BASE}/api/verify/aadhaar/generate-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aadhaar: aadhaar.trim() }),
+        body: JSON.stringify({ aadhaar: aadhaar.trim(), token }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to send OTP.");
@@ -450,7 +488,7 @@ export default function FormPage() {
       const res = await fetch(`${API_BASE}/api/verify/aadhaar/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ref_id: aadhaarRefId, otp: aadhaarOtp.trim() }),
+        body: JSON.stringify({ ref_id: aadhaarRefId, otp: aadhaarOtp.trim(), token }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "OTP verification failed.");
@@ -469,6 +507,7 @@ export default function FormPage() {
   async function handlePanVerify() {
     setPanError(null);
     setNameMatchOk(null);
+    setNameMatchScore(null);
     const pan = formData.pan?.trim();
     const PAN_REGEX = /^[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}$/;
     if (!pan || !PAN_REGEX.test(pan)) {
@@ -491,6 +530,7 @@ export default function FormPage() {
       setPanName(data.pan_name);
       setPanVerified(true);
       setNameMatchOk(data.name_match);
+      setNameMatchScore(data.name_match_score ?? null);
       if (data.name_match === false) {
         setPanError(data.name_match_message);
       }
@@ -501,6 +541,55 @@ export default function FormPage() {
     }
   }
 
+  async function handleBankVerify() {
+    setBankError(null);
+    setBankVerified(false);
+    setBankMatchResult(null);
+    const accountNumber = formData.bankAccountNumber?.trim();
+    const ifsc = formData.bankIfsc?.trim();
+
+    if (!accountNumber || !/^[0-9]{6,}$/.test(accountNumber)) {
+      setBankError("Please enter a valid bank account number (at least 6 digits).");
+      return;
+    }
+    if (!ifsc || !/^[A-Za-z0-9]{6,11}$/.test(ifsc)) {
+      setBankError("Please enter a valid IFSC code.");
+      return;
+    }
+    if (!aadhaarVerified || !panVerified || nameMatchOk !== true) {
+      setBankError("Please complete Aadhaar and PAN verification first.");
+      return;
+    }
+    setBankLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/verify/bank`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_number: accountNumber,
+          ifsc,
+          payee_name: meta?.name || "",
+          aadhaar_name: aadhaarName,
+          pan_name: panName,
+          token,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Bank account verification failed.");
+      setBankName(data.bank_name);
+      setBankVerified(true);
+      setBankMatchResult(data.match);
+      if (data.match && !data.match.passed) {
+        setBankError(data.message);
+      }
+    } catch (err) {
+      setBankError(err.message);
+    } finally {
+      setBankLoading(false);
+    }
+  }
+
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
@@ -508,7 +597,7 @@ export default function FormPage() {
 
     // KYC gate — must pass before submission
     if (!kycPassed) {
-      setFormError("Please complete Aadhaar and PAN verification before submitting.");
+      setFormError("Please complete Aadhaar, PAN, and Bank Account verification before submitting.");
       setSubmitting(false);
       return;
     }
@@ -689,9 +778,6 @@ export default function FormPage() {
             <h2 className="text-xs uppercase tracking-wider text-black font-bold mb-1 pb-1 border-b border-gray-100">
               Identity Verification (KYC)
             </h2>
-            <p className="text-[11px] text-gray-500 mb-4">
-              You must verify your Aadhaar and PAN before submitting. Your name must match across both documents.
-            </p>
 
             {/* ── Step 1: Aadhaar OTP ───────────────────────────────────── */}
             <div className={`border rounded-lg p-4 mb-3 ${aadhaarVerified ? "border-green-300 bg-green-50" : "border-gray-200 bg-gray-50"}`}>
@@ -753,14 +839,24 @@ export default function FormPage() {
                         className="w-full border-b-2 border-gray-200 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black transition-colors tracking-widest"
                       />
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleAadhaarVerifyOtp}
-                      disabled={aadhaarLoading || aadhaarOtp.length !== 6}
-                      className="bg-black text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
-                    >
-                      {aadhaarLoading ? "Verifying…" : "Verify OTP"}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAadhaarVerifyOtp}
+                        disabled={aadhaarLoading || aadhaarOtp.length !== 6}
+                        className="bg-black text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                      >
+                        {aadhaarLoading ? "Verifying…" : "Verify OTP"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAadhaarGenerateOtp}
+                        disabled={aadhaarLoading}
+                        className="bg-gray-200 text-gray-800 text-xs font-bold px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                      >
+                        Resend OTP
+                      </button>
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -814,7 +910,8 @@ export default function FormPage() {
                         onPaste={(e) => e.preventDefault()}
                         onCopy={(e) => e.preventDefault()}
                         autoComplete="off"
-                        className="w-full border-b-2 border-gray-200 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black transition-colors tracking-widest uppercase"
+                        disabled={panVerified && nameMatchOk}
+                        className="w-full border-b-2 border-gray-200 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black transition-colors tracking-widest uppercase disabled:text-gray-400 disabled:border-transparent"
                       />
                     </div>
                     <button
@@ -829,7 +926,7 @@ export default function FormPage() {
 
                   {panVerified && nameMatchOk && (
                     <p className="text-green-700 text-xs bg-green-50 border border-green-200 rounded px-3 py-1.5">
-                      ✓ Name match confirmed: Aadhaar name matches PAN name.
+                      ✓ Aadhaar ↔ PAN name match confirmed{nameMatchScore !== null ? ` (${nameMatchScore}% similarity)` : ""}.
                     </p>
                   )}
 
@@ -837,8 +934,152 @@ export default function FormPage() {
                     <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded px-3 py-1.5">
                       ⚠ {panError}
                       {nameMatchOk === false && (
-                        <span className="block mt-1 font-semibold">Form submission is blocked. Please use matching documents.</span>
+                        <span className="block mt-1 font-semibold">Please use matching documents to proceed.</span>
                       )}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ── Step 3: Bank Account Verification ─────────────────────── */}
+            <div className={`border rounded-lg p-4 mb-3 ${
+              bankVerified
+                ? bankMatchResult?.passed
+                  ? "border-green-300 bg-green-50"
+                  : "border-red-300 bg-red-50"
+                : "border-gray-200 bg-gray-50"
+            }`}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                  bankVerified && bankMatchResult?.passed
+                    ? "bg-green-600 text-white"
+                    : bankVerified && !bankMatchResult?.passed
+                    ? "bg-red-600 text-white"
+                    : "bg-gray-400 text-white"
+                }`}>
+                  {bankVerified && bankMatchResult?.passed ? "✓" : bankVerified && !bankMatchResult?.passed ? "✗" : "3"}
+                </span>
+                <span className="text-xs font-bold text-black">Bank Account Verification</span>
+                {bankVerified && bankMatchResult?.passed && (
+                  <span className="ml-auto text-[11px] font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                    Verified — {bankName}
+                  </span>
+                )}
+              </div>
+
+              {!aadhaarVerified || !panVerified || nameMatchOk !== true ? (
+                <p className="text-[11px] text-gray-400 italic">Complete Aadhaar and PAN verification first.</p>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-600 block mb-1">Account Number *</label>
+                      <input
+                        type="text"
+                        name="bankAccountNumber"
+                        value={formData.bankAccountNumber || ""}
+                        onChange={(e) => {
+                          handleChange({ target: { name: "bankAccountNumber", value: e.target.value.replace(/\D/g, "") } });
+                          setBankVerified(false);
+                          setBankMatchResult(null);
+                          setBankName(null);
+                          setBankError(null);
+                        }}
+                        placeholder="Account number"
+                        onPaste={(e) => e.preventDefault()}
+                        onCopy={(e) => e.preventDefault()}
+                        autoComplete="off"
+                        disabled={bankVerified && bankMatchResult?.passed}
+                        className="w-full border-b-2 border-gray-200 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black transition-colors disabled:text-gray-400 disabled:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-600 block mb-1">IFSC Code *</label>
+                      <input
+                        type="text"
+                        name="bankIfsc"
+                        value={formData.bankIfsc || ""}
+                        onChange={(e) => {
+                          handleChange({ target: { name: "bankIfsc", value: e.target.value.toUpperCase() } });
+                          setBankVerified(false);
+                          setBankMatchResult(null);
+                          setBankName(null);
+                          setBankError(null);
+                        }}
+                        placeholder="e.g. SBIN0001234"
+                        maxLength={11}
+                        onPaste={(e) => e.preventDefault()}
+                        autoComplete="off"
+                        disabled={bankVerified && bankMatchResult?.passed}
+                        className="w-full border-b-2 border-gray-200 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black uppercase transition-colors disabled:text-gray-400 disabled:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleBankVerify}
+                    disabled={bankLoading || !formData.bankAccountNumber || !formData.bankIfsc || bankVerified && bankMatchResult?.passed}
+                    className="bg-black text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {bankLoading ? "Verifying…" : bankVerified && bankMatchResult?.passed ? "Verified ✓" : "Verify Bank Account"}
+                  </button>
+
+                  {/* ── Name Match Matrix ──────────────────────────────── */}
+                  {bankVerified && bankMatchResult && (
+                    <div className={`rounded-lg border p-3 text-xs ${bankMatchResult.passed ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+                      <p className={`font-bold mb-2 ${bankMatchResult.passed ? "text-green-800" : "text-red-800"}`}>
+                        {bankMatchResult.passed
+                          ? `✓ Name match passed — ${bankMatchResult.matchCount}/${bankMatchResult.totalPairs} pairs match (≥60%)`
+                          : `✗ Name match failed — only ${bankMatchResult.matchCount}/${bankMatchResult.totalPairs} pairs match (need ≥3)`}
+                      </p>
+                      {/* Name reference row */}
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] text-gray-600 mb-2 bg-white/60 rounded px-2 py-1.5 border border-gray-100">
+                        <span><b className="text-gray-800">Payee:</b> {meta?.name || "—"}</span>
+                        <span><b className="text-gray-800">Aadhaar:</b> {aadhaarName}</span>
+                        <span><b className="text-gray-800">PAN:</b> {panName}</span>
+                        <span><b className="text-gray-800">Bank:</b> {bankName}</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {/* Column headers */}
+                        <div className="grid grid-cols-3 gap-1 text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                          <span>Pair</span>
+                          <span>Similarity</span>
+                          <span>Result</span>
+                        </div>
+                        {/* Helper to render one row */}
+                        {[
+                          { key: "payee_aadhaar", label: "Payee ↔ Aadhaar" },
+                          { key: "payee_pan",     label: "Payee ↔ PAN"     },
+                          { key: "payee_bank",    label: "Payee ↔ Bank"    },
+                          { key: "aadhaar_pan",   label: "Aadhaar ↔ PAN"  },
+                          { key: "aadhaar_bank",  label: "Aadhaar ↔ Bank" },
+                          { key: "pan_bank",      label: "PAN ↔ Bank"     },
+                        ].map(({ key, label }) => {
+                          const p = bankMatchResult.pairs[key];
+                          if (!p) return null;
+                          return (
+                            <div key={key} className="grid grid-cols-3 gap-1 items-center">
+                              <span className={`text-gray-700 ${key.startsWith("payee") ? "font-semibold" : ""}`}>{label}</span>
+                              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${p.ok ? "bg-green-500" : "bg-red-400"}`}
+                                  style={{ width: `${p.score}%` }}
+                                />
+                              </div>
+                              <span className={`font-bold ${p.ok ? "text-green-700" : "text-red-600"}`}>
+                                {p.score}% {p.ok ? "✓" : "✗"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {bankError && (
+                    <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded px-3 py-1.5">
+                      ⚠ {bankError}
                     </p>
                   )}
                 </div>
@@ -848,10 +1089,11 @@ export default function FormPage() {
             {/* KYC Status Banner */}
             {kycPassed && (
               <div className="mt-3 bg-green-600 text-white text-xs font-bold text-center py-2 rounded-lg">
-                ✓ KYC Verified — You may now fill your details and submit.
+                ✓ KYC Verified — Payee, Aadhaar, PAN &amp; Bank identity confirmed. You may now submit.
               </div>
             )}
           </div>
+
 
           {/* ── Personal Details (shown only after KYC passes) ────────────── */}
           {kycPassed && (
@@ -874,6 +1116,9 @@ export default function FormPage() {
             <h2 className="text-xs uppercase tracking-wider text-black font-bold mb-3 pb-1 border-b border-gray-100">
               Bank Account Details
             </h2>
+            <p className="text-[11px] text-gray-500 mb-3">
+              Account number and IFSC confirmed above. Please complete remaining fields.
+            </p>
             <BankDetails data={formData} onChange={handleChange} />
           </div>
           )}
@@ -887,7 +1132,7 @@ export default function FormPage() {
             disabled={submitting || !kycPassed}
             className="w-full bg-black text-white text-sm font-bold py-3 rounded-lg cursor-pointer transition-colors hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
           >
-            {submitting ? "Submitting…" : !kycPassed ? "Complete KYC to Submit" : "Submit Verification & Bank Details"}
+            {submitting ? "Submitting…" : !kycPassed ? "Complete KYC (3 Steps) to Submit" : "Submit Verification & Bank Details"}
           </button>
         </form>
 

@@ -125,7 +125,15 @@ router.get("/receipt/:token", rateLimiter, async (req, res) => {
 // GET /api/form/:token
 router.get("/:token", rateLimiter, async (req, res) => {
   try {
-    const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }, { utr_rrn_reference_number: req.params.token }] });
+    const tokenRegex = new RegExp(`^${req.params.token}$`, "i");
+    const record = await Record.findOne({ 
+      $or: [
+        { token: tokenRegex }, 
+        { payee_link_token: tokenRegex }, 
+        { utr_rrn_reference_number: tokenRegex }
+      ],
+      isDeleted: false
+    });
     if (!record) return res.status(404).json({ message: "Invalid link." });
 
     const isExpired = (record.expiresAt && new Date() > new Date(record.expiresAt)) || (Date.now() - new Date(record.createdAt).getTime() > 45 * 24 * 60 * 60 * 1000);
@@ -233,7 +241,21 @@ router.get("/:token", rateLimiter, async (req, res) => {
       programme_nature: record.programmeNature || record.programme_nature || record.natureOfProgramme || "",
       programme_title: record.programmeTitle || record.programme_title || record.titleOfProgramme || "",
       participation_type: record.participationType,
-      lecture_type: record.lectureType
+      lecture_type: record.lectureType,
+      // Restore KYC state
+      kyc_aadhaar_verified: record.kyc_aadhaar_verified,
+      kyc_aadhaar_name: record.kyc_aadhaar_name,
+      kyc_aadhaar_ref_id: record.kyc_aadhaar_ref_id,
+      kyc_pan_verified: record.kyc_pan_verified,
+      kyc_pan_name: record.kyc_pan_name,
+      kyc_pan_number: record.kyc_pan_number,
+      kyc_pan_match_score: record.kyc_pan_match_score,
+      kyc_bank_verified: record.kyc_bank_verified,
+      kyc_bank_name: record.kyc_bank_name,
+      kyc_bank_account: record.kyc_bank_account,
+      kyc_bank_ifsc: record.kyc_bank_ifsc,
+      kyc_bank_match: record.kyc_bank_match,
+      kyc_passed: record.kyc_passed,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -243,7 +265,15 @@ router.get("/:token", rateLimiter, async (req, res) => {
 // POST /api/form/:token
 router.post("/:token", rateLimiter, async (req, res) => {
   try {
-    const record = await Record.findOne({ $or: [{ token: req.params.token }, { payee_link_token: req.params.token }, { utr_rrn_reference_number: req.params.token }] });
+    const tokenRegex = new RegExp(`^${req.params.token}$`, "i");
+    const record = await Record.findOne({ 
+      $or: [
+        { token: tokenRegex }, 
+        { payee_link_token: tokenRegex }, 
+        { utr_rrn_reference_number: tokenRegex }
+      ],
+      isDeleted: false
+    });
     
     // Hide details: same generic error if token doesn't exist, is completed, or is expired
     if (!record || record.payee_status === "completed" || record.payee_status === "expired" || record.formSubmitted || new Date() > new Date(record.expiresAt)) {

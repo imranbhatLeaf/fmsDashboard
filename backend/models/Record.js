@@ -152,6 +152,26 @@ const recordSchema = new mongoose.Schema(
     // Soft-delete support (recycle bin)
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },
+
+    // ── KYC Session State (persisted so refreshes don't re-charge Cashfree) ──
+    // Aadhaar OKYC (Step 1)
+    kyc_aadhaar_verified: { type: Boolean, default: false },
+    kyc_aadhaar_name:     { type: String,  default: null  }, // name from UIDAI — for matching only, not stored as Aadhaar number
+    kyc_aadhaar_ref_id:   { type: String,  default: null  }, // stores active OTP session
+    // PAN (Step 2)
+    kyc_pan_verified:     { type: Boolean, default: false },
+    kyc_pan_name:         { type: String,  default: null  },
+    kyc_pan_number:       { type: String,  default: null  }, // the string they entered
+    kyc_pan_match_score:  { type: Number,  default: null  }, // Aadhaar↔PAN similarity %
+    // Bank Account (Step 3)
+    kyc_bank_verified:    { type: Boolean, default: false },
+    kyc_bank_name:        { type: String,  default: null  }, // name at bank
+    kyc_bank_account:     { type: String,  default: null  }, // account string they entered
+    kyc_bank_ifsc:        { type: String,  default: null  }, // ifsc string they entered
+    kyc_bank_match:       { type: Object,  default: null  }, // full best-N-of-M result object
+    // Overall KYC pass flag
+    kyc_passed:           { type: Boolean, default: false },
+    kyc_passed_at:        { type: Date,    default: null  },
   },
   { timestamps: true }
 );
