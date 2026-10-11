@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/logomain.avif";
-import headerImg from "../assets/header.png";
+import headerImg from "../assets/header.webp";
 
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:5000";
 

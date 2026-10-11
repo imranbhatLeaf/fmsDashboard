@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import headerImg from '../assets/header.png';
+import headerImg from '../assets/header.webp';
 
 const COMPONENTS = [
   {

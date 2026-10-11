@@ -110,7 +110,11 @@ export default function PreviewModal({ record, onClose }) {
               <div className="flex justify-between"><span className="text-gray-500">Name</span><span className="font-medium">{record.name}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Email</span><span>{record.email}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Phone</span><span>{formData.mobile || record.phoneMobile || record.phone_mobile || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">PAN</span><span>{formData.pan || record.pan || record.pan_number || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">PAN</span><span>{record.kyc_pan_number || formData.pan || record.pan || record.pan_number || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Aadhaar No.</span><span>{record.kyc_aadhaar_number || "—"}</span></div>
+              {record.kyc_aadhaar_name && (
+                <div className="flex justify-between"><span className="text-gray-500">Aadhaar Name</span><span>{record.kyc_aadhaar_name}</span></div>
+              )}
             </div>
           </div>
 

@@ -102,10 +102,19 @@ router.get("/", requireAuth, async (req, res) => {
       filter.adminApproved = adminApproved === "true";
     }
     
-    // Allow registrar to see both adminApproved and items they rejected
+    // Allow registrar to see formSubmitted records directly (no admin approval needed)
+    // ONLY IF KYC is clean and PAN is properly linked with Aadhaar.
+    // If PAN is not linked with Aadhaar, it must go to Admin first!
     if (req.query.registrarView === "true") {
       delete filter.adminApproved; // Override strict adminApproved check
       filter.$or = [
+        {
+          formSubmitted: true,
+          kyc_permanently_locked: { $ne: true },
+          kycFailed: { $ne: true },
+          pan_not_linked: { $ne: true },
+          admin_review_requested: { $ne: true }
+        },
         { adminApproved: true },
         { rejected: true, rejectedBy: "registrar" }
       ];
@@ -383,6 +392,26 @@ router.put("/:id/restore", requireAuth, requireRole(["registrar"]), async (req, 
 });
 
 // PUT /api/records/:id/approve -> Registrar Approval (Registrar-only)
+// PUT /api/records/:id/pan-bypass -> Admin Approval for PAN Bypass
+router.put("/:id/pan-bypass", requireAuth, requireRole(["admin"]), async (req, res) => {
+  try {
+    const record = await Record.findById(req.params.id);
+    if (!record) return res.status(404).json({ message: "Record not found" });
+
+    record.admin_pan_bypassed = true;
+    record.admin_review_requested = false;
+    record.kycFailed = false;
+    record.kyc_permanently_locked = false;
+    record.kyc_locked_until = null;
+    record.kyc_failed_attempts = 0;
+
+    await record.save();
+    res.json({ message: "PAN Bypass Approved", record });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 router.put("/:id/approve", requireAuth, requireRole(["registrar"]), async (req, res) => {
   try {
     const record = await Record.findById(req.params.id);
@@ -416,6 +445,8 @@ router.put("/:id/admin-approve", requireAuth, requireRole(["admin"]), async (req
     record.adminApproved = true;
     record.adminApprovedAt = new Date();
     record.dateOfForwarding = new Date(); // Req 11
+    record.admin_review_requested = false;
+    record.admin_pan_bypassed = true;
     // Clear any previous rejection
     record.rejected = false;
     record.rejectedAt = null;
@@ -755,3 +786,4 @@ router.delete("/:id", requireAuth, requireRole(["registrar"]), async (req, res) 
 });
 
 module.exports = router;
+

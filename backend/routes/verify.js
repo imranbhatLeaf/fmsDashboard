@@ -57,6 +57,19 @@ function nameSimilarity(a = "", b = "") {
   const arr2 = nb.split(" ").filter(Boolean);
   if (arr1.length === 0 || arr2.length === 0) return 0.0;
 
+  // Check if one name contains the other as exact words or with initials (e.g. "Joy K" vs "Joy")
+  const shorter = arr1.length <= arr2.length ? arr1 : arr2;
+  const longer = arr1.length <= arr2.length ? arr2 : arr1;
+  const allShorterInLonger = shorter.every(w => longer.includes(w));
+  if (allShorterInLonger) {
+    const extraWords = longer.filter(w => !shorter.includes(w));
+    // If extra words are just initials (1-2 chars) or empty
+    const onlyInitials = extraWords.every(w => w.length <= 2);
+    if (onlyInitials) {
+      return 0.9; // Strong match (90%) for "Joy K" vs "Joy"!
+    }
+  }
+
   let matchScore = 0;
   let used2 = new Set();
 
@@ -77,7 +90,14 @@ function nameSimilarity(a = "", b = "") {
     if (bestIdx !== -1) { matchScore += bestScore; used2.add(bestIdx); }
   }
 
+  const minWords = Math.min(arr1.length, arr2.length);
   const maxWords = Math.max(arr1.length, arr2.length);
+
+  // If all words of the shorter name matched:
+  if (matchScore >= minWords) {
+    return Math.max(0.75, matchScore / maxWords);
+  }
+
   return matchScore / maxWords;
 }
 
@@ -152,7 +172,10 @@ router.post("/aadhaar/generate-otp", rateLimiter, async (req, res) => {
       const errorRefId = cfData?.error?.refId || cfData?.ref_id;
       if (errorRefId) {
         if (token) {
-          await Record.updateOne({ token }, { $set: { kyc_aadhaar_ref_id: errorRefId } }, { strict: false });
+          const record = await Record.findOne({ $or: [{ token: new RegExp(`^${token}$`, "i") }, { payee_link_token: new RegExp(`^${token}$`, "i") }, { utr_rrn_reference_number: new RegExp(`^${token}$`, "i") }] });
+          if (record) {
+            await Record.updateOne({ _id: record._id }, { $set: { kyc_aadhaar_ref_id: errorRefId, kyc_aadhaar_number: aadhaar.trim() } }, { strict: false });
+          }
         }
         return res.json({
           success: true,
@@ -166,7 +189,10 @@ router.post("/aadhaar/generate-otp", rateLimiter, async (req, res) => {
     }
 
     if (token && cfData.ref_id) {
-      await Record.updateOne({ token }, { $set: { kyc_aadhaar_ref_id: cfData.ref_id } }, { strict: false });
+      const record = await Record.findOne({ $or: [{ token: new RegExp(`^${token}$`, "i") }, { payee_link_token: new RegExp(`^${token}$`, "i") }, { utr_rrn_reference_number: new RegExp(`^${token}$`, "i") }] });
+      if (record) {
+        await Record.updateOne({ _id: record._id }, { $set: { kyc_aadhaar_ref_id: cfData.ref_id, kyc_aadhaar_number: aadhaar.trim() } }, { strict: false });
+      }
     }
 
     return res.json({
@@ -223,13 +249,16 @@ router.post("/aadhaar/verify-otp", rateLimiter, async (req, res) => {
       });
     }
 
-    // ── Persist to DB so refresh doesn't re-charge ────────────────────────────
+      // ── Persist to DB so refresh doesn't re-charge ────────────────────────────
     if (token) {
-      await Record.updateOne(
-        { token },
-        { $set: { kyc_aadhaar_verified: true, kyc_aadhaar_name: aadhaarName } },
-        { strict: false }
-      );
+      const record = await Record.findOne({ $or: [{ token: new RegExp(`^${token}$`, "i") }, { payee_link_token: new RegExp(`^${token}$`, "i") }, { utr_rrn_reference_number: new RegExp(`^${token}$`, "i") }] });
+      if (record) {
+        await Record.updateOne(
+          { _id: record._id },
+          { $set: { kyc_aadhaar_verified: true, kyc_aadhaar_name: aadhaarName } },
+          { strict: false }
+        );
+      }
     }
 
     return res.json({
@@ -244,17 +273,80 @@ router.post("/aadhaar/verify-otp", rateLimiter, async (req, res) => {
   }
 });
 
+// ─── KYC Lock Helper ────────────────────────────────────────────────────────
+async function applyFailedKycLock(token, record) {
+  if (!record || !token) return null;
+  const now = new Date();
+  const attempts = (record.kyc_failed_attempts || 0) + 1;
+  let lockUntil = null;
+  let perm = false;
+
+  if (attempts < 3) {
+    await Record.updateOne(
+      { _id: record._id },
+      { $set: { kyc_failed_attempts: attempts } }
+    );
+    return `Name mismatch detected. (Attempt ${attempts} of 3). Please verify that your PAN and Aadhaar match.`;
+  }
+
+  if (attempts === 3) lockUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  else if (attempts === 4) lockUntil = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+  else { lockUntil = new Date(now.getTime() + 999 * 24 * 60 * 60 * 1000); perm = true; }
+
+  await Record.updateOne(
+    { _id: record._id },
+    { $set: { kyc_failed_attempts: attempts, kyc_locked_until: lockUntil, kyc_permanently_locked: perm } }
+  );
+
+  const hours = attempts === 3 ? 24 : attempts === 4 ? 48 : "permanently";
+  return `Name mismatch detected too many times. Your KYC has been locked for ${hours} ${perm ? '' : 'hours'}. Please try again later.`;
+}
+
+function checkKycLock(record) {
+  if (!record) return null;
+  if (record.kyc_permanently_locked) return "KYC is permanently blocked due to too many failed attempts.";
+  if (record.kyc_locked_until && new Date() < record.kyc_locked_until) {
+    const hoursLeft = Math.ceil((record.kyc_locked_until - new Date()) / (1000 * 60 * 60));
+    return `KYC is currently locked for ${hoursLeft} more hours due to previous mismatches.`;
+  }
+  return null;
+}
+
 // ─── POST /api/verify/pan ─────────────────────────────────────────────────────
 // Body: { pan: "ABCDE1234F", aadhaar_name: "...", token: "..." }
 // Cashfree: POST /verification/pan  -> returns registered_name
+router.post("/pan/request-review", rateLimiter, async (req, res) => {
+  try {
+    const { token, pan } = req.body;
+    if (!token) return res.status(400).json({ message: "Token is required." });
+    
+    const record = await Record.findOne({ token: new RegExp('^' + token + '$', 'i') });
+    if (!record) return res.status(404).json({ message: "Record not found." });
+
+    record.admin_review_requested = true;
+    record.admin_review_reason = "PAN not linked with Aadhaar";
+    if (pan) record.kyc_pan_number = pan.trim().toUpperCase(); // save attempted PAN for display on refresh
+    await record.save();
+
+    return res.json({ message: "Admin review requested successfully. Please wait for approval." });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
 router.post("/pan", rateLimiter, async (req, res) => {
   const { pan, aadhaar_name, token } = req.body;
 
   const PAN_REGEX = /^[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}$/;
   if (!pan || !PAN_REGEX.test(pan.trim())) {
-    return res.status(400).json({
-      message: "Please enter a valid PAN (e.g. ABCDE1234F).",
-    });
+    return res.status(400).json({ message: "Please enter a valid PAN (e.g. ABCDE1234F)." });
+  }
+
+  let record = null;
+  if (token) {
+    record = await Record.findOne({ $or: [{ token: new RegExp(`^${token}$`, "i") }, { payee_link_token: new RegExp(`^${token}$`, "i") }, { utr_rrn_reference_number: new RegExp(`^${token}$`, "i") }] });
+    const lockMsg = checkKycLock(record);
+    if (lockMsg) return res.status(403).json({ message: lockMsg });
   }
 
   try {
@@ -272,6 +364,44 @@ router.post("/pan", rateLimiter, async (req, res) => {
     if (!cfRes.ok || cfData.valid === false || cfData.pan_status === "INVALID") {
       const msg =
         cfData?.message || cfData?.pan_status_desc || cfData?.error?.message || "PAN verification failed.";
+
+      const isUnlinkedError =
+        msg.toLowerCase().includes("not linked") ||
+        msg.toLowerCase().includes("aadhaar not seeded") ||
+        msg.toLowerCase().includes("seeding") ||
+        cfData?.aadhaar_seeding_status === "R" ||
+        cfData?.aadhaar_seeding_status === "N";
+
+      if (isUnlinkedError && token && record) {
+        await Record.updateOne(
+          { _id: record._id },
+          { 
+            $set: { 
+              kyc_pan_verified: true,
+              kyc_pan_name: aadhaar_name || record.name,
+              kyc_pan_number: pan.trim().toUpperCase(),
+              kyc_pan_match_score: 100,
+              admin_review_requested: true, 
+              admin_review_reason: "PAN not linked to Aadhaar",
+              pan_not_linked: true,
+              pan_aadhaar_linked: false
+            } 
+          },
+          { strict: false }
+        );
+        return res.json({
+          success: true,
+          pan_name: aadhaar_name || record.name,
+          name_match: true,
+          name_match_score: 100,
+          name_match_message: "PAN accepted. Aadhaar is not linked with PAN.",
+          pan_not_linked: true,
+          pan_aadhaar_linked: false,
+          aadhaar_seeding_status: cfData?.aadhaar_seeding_status || "R",
+          message: "Your Aadhaar is not linked with this PAN. You can proceed to submit the form; it will be sent to Admin for review.",
+        });
+      }
+
       return res.status(cfRes.ok ? 400 : cfRes.status).json({ message: msg });
     }
 
@@ -290,17 +420,48 @@ router.post("/pan", rateLimiter, async (req, res) => {
 
     // Check if Aadhaar is linked to PAN
     const seedingStatus = cfData?.aadhaar_seeding_status;
-    if (seedingStatus && seedingStatus === "R") {
-      if (token) {
+    const isPanNotLinked =
+      seedingStatus === "R" ||
+      seedingStatus === "N" ||
+      seedingStatus === "NOT_LINKED" ||
+      cfData?.pan_status === "INOPERATIVE";
+
+    if (isPanNotLinked) {
+      if (record) {
         await Record.updateOne(
-          { token },
-          { $set: { kycFailed: true, kycFailedReason: "PAN not linked to Aadhaar" } },
+          { _id: record._id },
+          { 
+            $set: { 
+              admin_review_requested: true, 
+              admin_review_reason: "PAN not linked to Aadhaar",
+              pan_not_linked: true,
+              pan_aadhaar_linked: false
+            } 
+          },
           { strict: false }
         );
+        record.admin_review_requested = true;
+        record.admin_review_reason = "PAN not linked to Aadhaar";
+        record.pan_not_linked = true;
+        record.pan_aadhaar_linked = false;
       }
-      return res.status(400).json({
-        message: "Your PAN is not linked to your Aadhaar. Please link them and try again. Form cannot be opened.",
-      });
+    } else if (record && (seedingStatus === "Y" || seedingStatus === "LINKED")) {
+      await Record.updateOne(
+        { _id: record._id },
+        { 
+          $set: { 
+            pan_not_linked: false,
+            pan_aadhaar_linked: true,
+            admin_review_requested: false,
+            admin_review_reason: null
+          } 
+        },
+        { strict: false }
+      );
+      record.pan_not_linked = false;
+      record.pan_aadhaar_linked = true;
+      record.admin_review_requested = false;
+      record.admin_review_reason = null;
     }
 
     // Compare Aadhaar name vs PAN name
@@ -314,18 +475,36 @@ router.post("/pan", rateLimiter, async (req, res) => {
       nameMatchMessage = nameMatch
         ? `Aadhaar name matches PAN name (${nameMatchScore}% similarity).`
         : `Name mismatch: Aadhaar "${aadhaar_name}" vs PAN "${panName}" (${nameMatchScore}% similarity).`;
+
+      // HYPER-STRICT RULE: Payee Name must also match Aadhaar and PAN here
+      if (nameMatch && record && record.name && record.name.trim() !== "") {
+        const payeeAadhaarScore = nameSimilarity(record.name, aadhaar_name);
+        const payeePanScore = nameSimilarity(record.name, panName);
+        
+        if (payeeAadhaarScore < 0.6 || payeePanScore < 0.6) {
+          nameMatch = false; // Force lock here at step 2
+          nameMatchMessage = `Name mismatch: Identity documents do not match the required Payee Name "${record.name}".`;
+        }
+      }
     }
 
     // ── Persist PAN to DB ─────────────────────────────────────────────────────
     if (token && panName) {
+      if (nameMatch === false) {
+        const lockMsg = await applyFailedKycLock(token, record);
+        return res.status(403).json({ message: lockMsg });
+      }
+
       await Record.updateOne(
-        { token },
+        { _id: record._id },
         { 
           $set: { 
             kyc_pan_verified: true, 
             kyc_pan_name: panName,
             kyc_pan_number: pan,
-            kyc_pan_match_score: nameMatchScore 
+            kyc_pan_match_score: nameMatchScore,
+            pan_not_linked: isPanNotLinked,
+            pan_aadhaar_linked: !isPanNotLinked
           } 
         },
         { strict: false }
@@ -338,7 +517,12 @@ router.post("/pan", rateLimiter, async (req, res) => {
       name_match: nameMatch,
       name_match_score: nameMatchScore,
       name_match_message: nameMatchMessage,
-      message: nameMatch === false ? nameMatchMessage : "PAN verified successfully.",
+      pan_not_linked: isPanNotLinked,
+      pan_aadhaar_linked: !isPanNotLinked,
+      aadhaar_seeding_status: seedingStatus,
+      message: isPanNotLinked
+        ? "PAN verified. Note: Your Aadhaar is not linked with PAN. You can proceed with the form; it will be sent to Admin for review."
+        : "PAN verified successfully.",
     });
   } catch (err) {
     console.error("PAN verification error:", err);
@@ -351,18 +535,20 @@ router.post("/pan", rateLimiter, async (req, res) => {
 // Cashfree: POST /verification/bank-account/sync
 // Runs 4-source name match: Payee × Aadhaar × PAN × Bank (6 pairs, pass if >= 3/6 >= 60%).
 router.post("/bank", rateLimiter, async (req, res) => {
-  const { account_number, ifsc, payee_name, aadhaar_name, pan_name } = req.body;
+  const { account_number, ifsc, payee_name, aadhaar_name, pan_name, token } = req.body;
 
   if (!account_number || !/^[0-9]{6,}$/.test(account_number.trim())) {
-    return res.status(400).json({
-      message: "Please enter a valid bank account number (at least 6 digits).",
-    });
+    return res.status(400).json({ message: "Please enter a valid bank account number (at least 6 digits)." });
+  }
+  if (!ifsc || !/^[A-Za-z0-9]{6,11}$/.test(ifsc.trim())) {
+    return res.status(400).json({ message: "Please enter a valid IFSC code." });
   }
 
-  if (!ifsc || !/^[A-Za-z0-9]{6,11}$/.test(ifsc.trim())) {
-    return res.status(400).json({
-      message: "Please enter a valid IFSC code.",
-    });
+  let record = null;
+  if (token) {
+    record = await Record.findOne({ $or: [{ token: new RegExp(`^${token}$`, "i") }, { payee_link_token: new RegExp(`^${token}$`, "i") }, { utr_rrn_reference_number: new RegExp(`^${token}$`, "i") }] });
+    const lockMsg = checkKycLock(record);
+    if (lockMsg) return res.status(403).json({ message: lockMsg });
   }
 
   try {
@@ -377,51 +563,36 @@ router.post("/bank", rateLimiter, async (req, res) => {
     });
 
     const cfData = await cfRes.json();
-
-    const accountStatus =
-      cfData?.account_status ||
-      cfData?.data?.account_status ||
-      cfData?.status ||
-      "";
+    const accountStatus = cfData?.account_status || cfData?.data?.account_status || cfData?.status || "";
 
     if (!cfRes.ok || accountStatus === "INVALID") {
-      const msg =
-        cfData?.message ||
-        cfData?.error?.message ||
-        "Bank account verification failed. Please check your account number and IFSC.";
+      const msg = cfData?.message || cfData?.error?.message || "Bank account verification failed. Please check your account number and IFSC.";
       return res.status(cfRes.ok ? 400 : cfRes.status).json({ message: msg });
     }
 
-    // Extract bank-registered name
-    const bankName =
-      cfData?.name_at_bank ||
-      cfData?.data?.name_at_bank ||
-      cfData?.registered_name ||
-      cfData?.data?.registered_name ||
-      cfData?.account_name ||
-      cfData?.data?.account_name ||
-      null;
+    const bankName = cfData?.name_at_bank || cfData?.data?.name_at_bank || cfData?.registered_name || cfData?.data?.registered_name || cfData?.account_name || cfData?.data?.account_name || null;
 
     if (!bankName) {
-      return res.status(400).json({
-        message: "Could not retrieve account holder name from bank. Please verify your details.",
-      });
+      return res.status(400).json({ message: "Could not retrieve account holder name from bank. Please verify your details." });
     }
 
-    // 4-source match: Payee × Aadhaar × PAN × Bank (6 pairs, need >= 3/6)
     let matchResult = null;
     if (payee_name && aadhaar_name && pan_name) {
       matchResult = nameMatchAll4(payee_name, aadhaar_name, pan_name, bankName);
     } else if (aadhaar_name && pan_name) {
-      // fallback if payee_name not sent
       matchResult = nameMatchAll4("", aadhaar_name, pan_name, bankName);
     }
 
-    // ── Persist Bank & Overall KYC to DB ──────────────────────────────────────
-    if (req.body.token && bankName) {
+    if (token && bankName) {
       const overallPassed = matchResult ? matchResult.passed : false;
+
+      if (!overallPassed) {
+        const lockMsg = await applyFailedKycLock(token, record);
+        return res.status(403).json({ message: lockMsg });
+      }
+
       await Record.updateOne(
-        { token: req.body.token },
+        { _id: record._id },
         { 
           $set: { 
             kyc_bank_verified: true,
@@ -429,8 +600,8 @@ router.post("/bank", rateLimiter, async (req, res) => {
             kyc_bank_account: account_number.trim(),
             kyc_bank_ifsc: ifsc.trim().toUpperCase(),
             kyc_bank_match: matchResult,
-            kyc_passed: overallPassed,
-            ...(overallPassed ? { kyc_passed_at: new Date() } : {})
+            kyc_passed: true,
+            kyc_passed_at: new Date()
           } 
         },
         { strict: false }
@@ -442,11 +613,9 @@ router.post("/bank", rateLimiter, async (req, res) => {
       bank_name: bankName,
       account_status: accountStatus,
       match: matchResult,
-      message: matchResult
-        ? (matchResult.passed
-            ? `Bank verified. Name match passed.`
-            : `Name mismatch: The Admin-entered Payee Name must match ALL of your official documents (Aadhaar, PAN, and Bank). Please contact accounts to correct your name.`)
-        : "Bank account verified successfully.",
+      message: matchResult && matchResult.passed
+        ? `Bank verified. Name match passed.`
+        : `Name mismatch: The Admin-entered Payee Name must match ALL of your official documents (Aadhaar, PAN, and Bank). Please contact accounts to correct your name.`,
     });
   } catch (err) {
     console.error("Bank account verification error:", err);
@@ -455,3 +624,5 @@ router.post("/bank", rateLimiter, async (req, res) => {
 });
 
 module.exports = router;
+
+

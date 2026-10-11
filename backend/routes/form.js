@@ -201,6 +201,12 @@ router.get("/:token", rateLimiter, async (req, res) => {
       approvalStatus = "Approved by Registrar, Pending for Payment";
     } else if (record.adminApproved) {
       approvalStatus = "Approved by Accounts (Admin), Pending Registrar Approval";
+    } else if (record.formSubmitted) {
+      if (record.pan_not_linked || record.admin_review_requested) {
+        approvalStatus = "Pending Accounts (Admin) Approval (Aadhaar not linked with PAN)";
+      } else {
+        approvalStatus = "Pending Registrar Approval";
+      }
     }
 
     res.json({
@@ -256,6 +262,13 @@ router.get("/:token", rateLimiter, async (req, res) => {
       kyc_bank_ifsc: record.kyc_bank_ifsc,
       kyc_bank_match: record.kyc_bank_match,
       kyc_passed: record.kyc_passed,
+      
+      kyc_failed_attempts: record.kyc_failed_attempts || 0,
+      kyc_locked_until: record.kyc_locked_until,
+      kyc_permanently_locked: record.kyc_permanently_locked || false,
+      admin_pan_bypassed: record.admin_pan_bypassed || false,
+      admin_review_requested: record.admin_review_requested || false,
+      pan_not_linked: record.pan_not_linked || false,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

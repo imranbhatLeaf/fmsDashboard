@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logomain.avif";
 import asssrLogo from "../assets/asssrFav.avif";
-import headerImg from "../assets/header.png";
+import headerImg from "../assets/header.webp";
 import RecordModal from "../components/RecordModal";
 import PreviewModal from "../components/PreviewModal";
 // Point this at your Express backend. In Vite, set VITE_API_BASE in your .env file.
@@ -50,6 +50,20 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to reset password.");
       alert("Password reset successfully.");
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+    async function handleApprovePanBypass(id) {
+    if (!window.confirm("Approve PAN Bypass? The user will be able to proceed without Aadhaar-PAN linkage.")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/records/${id}/pan-bypass`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${auth?.token}` }
+      });
+      if (!res.ok) throw new Error("PAN Bypass approval failed");
+      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, admin_review_requested: false, admin_pan_bypassed: true, kycFailed: false } : r));
     } catch (err) {
       alert(err.message);
     }
@@ -346,7 +360,21 @@ export default function AdminDashboard() {
     if (r.paymentProcessed) return "Paid";
     if (r.registrarApproved) return "Approved by Registrar, Pending for Payment";
     if (r.adminApproved) return "Pending Registrar Approval";
-    if (r.formSubmitted) return "Approval Pending";
+    if (r.kyc_permanently_locked) return "KYC Blocked (Permanent)";
+    if (r.kyc_locked_until && new Date() < new Date(r.kyc_locked_until)) {
+      const hoursLeft = Math.ceil((new Date(r.kyc_locked_until) - new Date()) / (1000 * 60 * 60));
+      return `KYC Locked (${hoursLeft}h)`;
+    }
+
+    // If PAN is not linked to Aadhaar (or review requested) and form is submitted:
+    // goes to Admin for regular Admin approval flow!
+    if (r.formSubmitted && (r.pan_not_linked || r.admin_review_requested)) {
+      return "Approval Pending";
+    }
+
+    if (r.admin_review_requested) return "PAN Approval Pending";
+
+    if (r.formSubmitted) return "Pending Registrar Approval";
     return "Form Pending";
   };
 
@@ -664,11 +692,11 @@ export default function AdminDashboard() {
                               style={
                                 status === "Paid"
                                   ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
-                                  : status === "Rejected" || status === "KYC Failed"
+                                  : status === "Rejected" || status.includes("KYC")
                                   ? { background: "#fef2f2", color: "#dc2626", borderColor: "#fca5a5" }
                                   : status === "Approved by Registrar, Pending for Payment" || status === "Approval Pending"
                                   ? { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
-                                  : status === "Pending Registrar Approval"
+                                  : status === "Pending Registrar Approval" || status === "PAN Approval Pending"
                                   ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
                                   : { background: "#f8fafc", color: "#64748b", borderColor: "#e2e8f0" }
                               }
@@ -683,7 +711,15 @@ export default function AdminDashboard() {
   {status === "Approved by Registrar, Pending for Payment" && (r.registrarApprovedAt || r.dateOfApproval) && (
     <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.registrarApprovedAt || r.dateOfApproval)}</div>
   )}
-  {status === "Pending Registrar Approval" && (r.adminApprovedAt || r.dateOfForwarding) && (
+                                  {status === "PAN Approval Pending" && (
+                                  <button
+                                    onClick={() => handleApprovePanBypass(r._id)}
+                                    className="text-[11px] font-bold uppercase tracking-wider text-white bg-orange-500 hover:bg-orange-600 px-1.5 py-0.5 rounded transition-colors shadow-sm"
+                                  >
+                                    Approve PAN
+                                  </button>
+                                )}
+                                {status === "Pending Registrar Approval" && (r.adminApprovedAt || r.dateOfForwarding) && (
     <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.adminApprovedAt || r.dateOfForwarding)}</div>
   )}
   {status === "Approval Pending" && r.dateOfUpload && (
@@ -717,7 +753,15 @@ export default function AdminDashboard() {
                                   </button>
                                 </>
                               )}
-                              {status === "Pending Registrar Approval" && (
+                                                              {status === "PAN Approval Pending" && (
+                                  <button
+                                    onClick={() => handleApprovePanBypass(r._id)}
+                                    className="text-[11px] font-bold uppercase tracking-wider text-white bg-orange-500 hover:bg-orange-600 px-1.5 py-0.5 rounded transition-colors shadow-sm"
+                                  >
+                                    Approve PAN
+                                  </button>
+                                )}
+                                {status === "Pending Registrar Approval" && (
                                 <span className="text-[11px] text-gray-400 italic">Awaiting Registrar</span>
                               )}
                               {status === "Approved by Registrar, Pending for Payment" && (
@@ -990,4 +1034,8 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+
+
+
 

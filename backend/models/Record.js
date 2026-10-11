@@ -156,7 +156,7 @@ const recordSchema = new mongoose.Schema(
     // ── KYC Session State (persisted so refreshes don't re-charge Cashfree) ──
     // Aadhaar OKYC (Step 1)
     kyc_aadhaar_verified: { type: Boolean, default: false },
-    kyc_aadhaar_name:     { type: String,  default: null  }, // name from UIDAI — for matching only, not stored as Aadhaar number
+    kyc_aadhaar_name: { type: String, default: null }, kyc_aadhaar_number: { type: String, default: null },  // name from UIDAI — for matching only, not stored as Aadhaar number
     kyc_aadhaar_ref_id:   { type: String,  default: null  }, // stores active OTP session
     // PAN (Step 2)
     kyc_pan_verified:     { type: Boolean, default: false },
@@ -172,6 +172,16 @@ const recordSchema = new mongoose.Schema(
     // Overall KYC pass flag
     kyc_passed:           { type: Boolean, default: false },
     kyc_passed_at:        { type: Date,    default: null  },
+    
+    // Cooldown / Lockdown for mismatched identities
+    kyc_failed_attempts:    { type: Number,  default: 0     },
+    kyc_locked_until:       { type: Date,    default: null  },
+    kyc_permanently_locked: { type: Boolean, default: false },
+    admin_review_requested: { type: Boolean, default: false },
+    admin_review_reason: { type: String, default: null },
+    admin_pan_bypassed: { type: Boolean, default: false },
+    pan_not_linked: { type: Boolean, default: false },
+    pan_aadhaar_linked: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

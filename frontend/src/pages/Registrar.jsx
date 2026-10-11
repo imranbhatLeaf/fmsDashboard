@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logomain.avif";
 import asssrLogo from "../assets/asssrFav.avif";
-import headerImg from "../assets/header.png";
+import headerImg from "../assets/header.webp";
 import RecordModal from "../components/RecordModal";
 import PreviewModal from "../components/PreviewModal";
 
@@ -199,11 +199,20 @@ export default function Registrar() {
 
 
   const getRecordStatus = (r) => {
+    if (r.kycFailed) return "KYC Failed";
     if (r.rejected) return "Rejected";
     if (r.paymentProcessed) return "Paid";
     if (r.registrarApproved) return "Approved";
     if (r.adminApproved) return "Pending Registrar Approval";
+    if (r.formSubmitted && !r.pan_not_linked && !r.admin_review_requested) return "Pending Registrar Approval";
     if (r.formSubmitted) return "Pending Admin Approval";
+    
+    if (r.kyc_permanently_locked) return "KYC Blocked (Permanent)";
+    if (r.kyc_locked_until && new Date() < new Date(r.kyc_locked_until)) {
+      const hoursLeft = Math.ceil((new Date(r.kyc_locked_until) - new Date()) / (1000 * 60 * 60));
+      return `KYC Locked (${hoursLeft}h)`;
+    }
+
     return "Form Pending";
   };
 
@@ -453,7 +462,7 @@ export default function Registrar() {
                               style={
                                 status === "Approved" || status === "Paid"
                                   ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
-                                  : status === "Rejected"
+                                  : status === "Rejected" || status.includes("KYC")
                                   ? { background: "#fef2f2", color: "#dc2626", borderColor: "#fca5a5" }
                                   : status === "Pending Registrar Approval"
                                   ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }

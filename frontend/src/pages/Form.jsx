@@ -367,8 +367,11 @@ export default function FormPage() {
   const [panName, setPanName] = useState(null);
   const [panLoading, setPanLoading] = useState(false);
   const [panError, setPanError] = useState(null);
+  const [requestingAdminReview, setRequestingAdminReview] = useState(false);
+  const [reviewRequestedSuccess, setReviewRequestedSuccess] = useState(false);
   const [nameMatchOk, setNameMatchOk] = useState(null);      // Aadhaar↔PAN match: null|true|false
   const [nameMatchScore, setNameMatchScore] = useState(null); // Aadhaar↔PAN similarity %
+  const [panNotLinked, setPanNotLinked] = useState(false);
 
   // Step 3: Bank Account Verification
   const [bankVerified, setBankVerified] = useState(false);
@@ -376,6 +379,10 @@ export default function FormPage() {
   const [bankLoading, setBankLoading] = useState(false);
   const [bankError, setBankError] = useState(null);
   const [bankMatchResult, setBankMatchResult] = useState(null); // best-2-of-3 result
+
+  // KYC Lock State
+  const [kycLocked, setKycLocked] = useState(false);
+  const [kycLockMessage, setKycLockMessage] = useState(null);
 
   // KYC fully passed = all 3 verified + best-2-of-3 name match passed
   const kycPassed = aadhaarVerified && panVerified && nameMatchOk === true && bankVerified && bankMatchResult?.passed === true;
@@ -390,6 +397,16 @@ export default function FormPage() {
         if (data.formSubmitted) {
           setSubmitted(true);
         }
+
+        if (data.kyc_permanently_locked) {
+          setKycLocked(true);
+          setKycLockMessage("KYC is permanently blocked due to too many failed name matches.");
+        } else if (data.kyc_locked_until && new Date() < new Date(data.kyc_locked_until)) {
+          setKycLocked(true);
+          const hoursLeft = Math.ceil((new Date(data.kyc_locked_until) - new Date()) / (1000 * 60 * 60));
+          setKycLockMessage(`KYC is currently locked for ${hoursLeft} more hours due to previous mismatches.`);
+        }
+
         setFormData({
           name: data.name,
           email: data.email,
@@ -414,11 +431,24 @@ export default function FormPage() {
           setAadhaarName(data.kyc_aadhaar_name);
           setAadhaarStep("done");
         } else if (data.kyc_aadhaar_ref_id) {
-          // If they generated an OTP but refreshed before verifying
           setAadhaarRefId(data.kyc_aadhaar_ref_id);
           setAadhaarStep("otp");
         }
-        if (data.kyc_pan_verified) {
+        if (data.admin_review_requested || data.pan_not_linked) {
+          setPanNotLinked(true);
+          // Restore the attempted PAN so it shows in the field on refresh
+          if (data.kyc_pan_number) {
+            setFormData(prev => ({ ...prev, pan: data.kyc_pan_number, panConfirm: data.kyc_pan_number }));
+          }
+        }
+
+        if (data.admin_pan_bypassed) {
+          setPanVerified(true);
+          setPanName(data.kyc_pan_name || "Admin Bypassed");
+          setNameMatchOk(true);
+          setNameMatchScore(100);
+          setFormData(prev => ({ ...prev, pan: data.kyc_pan_number || "BYPASSED", panConfirm: data.kyc_pan_number || "BYPASSED" }));
+        } else if (data.kyc_pan_verified) {
           setPanVerified(true);
           setPanName(data.kyc_pan_name);
           setNameMatchScore(data.kyc_pan_match_score);
@@ -467,7 +497,13 @@ export default function FormPage() {
         body: JSON.stringify({ aadhaar: aadhaar.trim(), token }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to send OTP.");
+      if (!res.ok) {
+        if (data.message && data.message.includes("Otp generated for this aadhaar")) {
+          setAadhaarStep("otp");
+          if (data.ref_id) setAadhaarRefId(data.ref_id);
+        }
+        throw new Error(data.message || "Failed to send OTP.");
+      }
       setAadhaarRefId(data.ref_id);
       setAadhaarStep("otp");
     } catch (err) {
@@ -495,7 +531,7 @@ export default function FormPage() {
       setAadhaarName(data.aadhaar_name);
       setAadhaarVerified(true);
       setAadhaarStep("done");
-      // Auto-fill beneficiary name from Aadhaar name
+      // Aut!fill beneficiary name from Aadhaar name
       setFormData((prev) => ({ ...prev, bankBeneficiaryName: data.aadhaar_name }));
     } catch (err) {
       setAadhaarError(err.message);
@@ -529,15 +565,52 @@ export default function FormPage() {
       if (!res.ok) throw new Error(data.message || "PAN verification failed.");
       setPanName(data.pan_name);
       setPanVerified(true);
+      setFormData(prev => ({ ...prev, panConfirm: pan }));
       setNameMatchOk(data.name_match);
       setNameMatchScore(data.name_match_score ?? null);
+      if (data.pan_not_linked) {
+        setPanNotLinked(true);
+      } else {
+        setPanNotLinked(false);
+      }
       if (data.name_match === false) {
         setPanError(data.name_match_message);
       }
     } catch (err) {
-      setPanError(err.message);
+      if (err.message && (err.message.toLowerCase().includes("not linked") || err.message.toLowerCase().includes("seeding"))) {
+        setPanVerified(true);
+        setPanNotLinked(true);
+        setNameMatchOk(true);
+        setPanName(aadhaarName || "Provided PAN");
+        setFormData(prev => ({ ...prev, panConfirm: pan }));
+        setPanError(null);
+      } else {
+        setPanError(err.message);
+        if (err.message.includes("locked")) {
+          setKycLocked(true);
+          setKycLockMessage(err.message);
+        }
+      }
     } finally {
       setPanLoading(false);
+    }
+  }
+
+    async function handleRequestAdminReview() {
+    setRequestingAdminReview(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/verify/pan/request-review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to request review");
+      setReviewRequestedSuccess(true);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRequestingAdminReview(false);
     }
   }
 
@@ -578,12 +651,17 @@ export default function FormPage() {
       if (!res.ok) throw new Error(data.message || "Bank account verification failed.");
       setBankName(data.bank_name);
       setBankVerified(true);
+      setFormData(prev => ({ ...prev, bankAccountNumberConfirm: accountNumber, bankIfscConfirm: ifsc }));
       setBankMatchResult(data.match);
       if (data.match && !data.match.passed) {
         setBankError(data.message);
       }
     } catch (err) {
       setBankError(err.message);
+      if (err.message.includes("locked")) {
+        setKycLocked(true);
+        setKycLockMessage(err.message);
+      }
     } finally {
       setBankLoading(false);
     }
@@ -713,15 +791,22 @@ export default function FormPage() {
       <div className="min-h-screen bg-[#f5f5f0] flex items-center justify-center px-4" style={{ fontFamily: 'Tahoma, sans-serif' }}>
         <div className="bg-white border border-[#e0e0e0] rounded-xl p-8 max-w-md text-center shadow-sm w-full">
           <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center mx-auto mb-4 font-bold text-sm">
-            ✓
+            ✔
           </div>
           <h2 className="text-base font-bold mb-2 text-black font-serif">Form Submitted</h2>
           <p className="text-xs text-gray-500 mb-6">Your verification details and bank account have been successfully submitted.</p>
           
-          <div className="bg-gray-50 rounded-lg p-4 mb-6 border border-gray-100 text-left">
+          <div className="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-100 text-left">
             <span className="text-[10px] font-bold uppercase text-gray-400 block mb-1">Current Status</span>
             <span className="text-xs font-bold text-black">{status}</span>
           </div>
+
+          {(panNotLinked || meta?.pan_not_linked || meta?.admin_review_requested) && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-left mb-6 text-xs text-amber-800">
+              <span className="font-bold block mb-1">⚠️ Note: Aadhaar not linked with PAN</span>
+              Your form has been routed to <strong>Accounts (Admin)</strong> for manual verification because your PAN is not linked with your Aadhaar.
+            </div>
+          )}
 
           <button
             onClick={() => {
@@ -779,11 +864,17 @@ export default function FormPage() {
               Identity Verification (KYC)
             </h2>
 
+            {kycLocked && (
+              <div className="bg-red-100 border border-red-300 text-red-700 p-4 rounded-lg mb-4 text-sm font-semibold flex gap-2">
+                <span className="text-xl">🔒</span>
+                <div>{kycLockMessage}</div>
+              </div>
+            )}
             {/* ── Step 1: Aadhaar OTP ───────────────────────────────────── */}
             <div className={`border rounded-lg p-4 mb-3 ${aadhaarVerified ? "border-green-300 bg-green-50" : "border-gray-200 bg-gray-50"}`}>
               <div className="flex items-center gap-2 mb-3">
                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${aadhaarVerified ? "bg-green-600 text-white" : "bg-black text-white"}`}>
-                  {aadhaarVerified ? "✓" : "1"}
+                  {aadhaarVerified ? "✔" : "1"}
                 </span>
                 <span className="text-xs font-bold text-black">Aadhaar Verification (OKYC)</span>
                 {aadhaarVerified && (
@@ -874,15 +965,33 @@ export default function FormPage() {
             </div>
 
             {/* ── Step 2: PAN Verification ──────────────────────────────── */}
-            <div className={`border rounded-lg p-4 ${panVerified ? (nameMatchOk ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50") : "border-gray-200 bg-gray-50"}`}>
+            <div className={`border rounded-lg p-4 ${
+              panVerified
+                ? panNotLinked
+                  ? "border-amber-300 bg-amber-50/40"
+                  : "border-green-300 bg-green-50"
+                : panError
+                ? "border-red-300 bg-red-50"
+                : "border-gray-200 bg-gray-50"
+            }`}>
               <div className="flex items-center gap-2 mb-3">
-                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${panVerified && nameMatchOk ? "bg-green-600 text-white" : panVerified && !nameMatchOk ? "bg-red-600 text-white" : "bg-gray-400 text-white"}`}>
-                  {panVerified && nameMatchOk ? "✓" : panVerified && !nameMatchOk ? "✗" : "2"}
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                  panVerified
+                    ? panNotLinked
+                      ? "bg-amber-600 text-white"
+                      : "bg-green-600 text-white"
+                    : "bg-gray-400 text-white"
+                }`}>
+                  {panVerified ? "✔" : "2"}
                 </span>
                 <span className="text-xs font-bold text-black">PAN Verification</span>
-                {panVerified && nameMatchOk && (
-                  <span className="ml-auto text-[11px] font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                    Verified — {panName}
+                {panVerified && (
+                  <span className={`ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                    panNotLinked
+                      ? "text-amber-800 bg-amber-100"
+                      : "text-green-700 bg-green-100"
+                  }`}>
+                    {panNotLinked ? `Accepted (Unlinked) — ${panName}` : `Verified — ${panName}`}
                   </span>
                 )}
               </div>
@@ -904,30 +1013,43 @@ export default function FormPage() {
                           setNameMatchOk(null);
                           setPanName(null);
                           setPanError(null);
+                          setPanNotLinked(false);
                         }}
                         placeholder="e.g. ABCDE1234F"
                         maxLength={10}
                         onPaste={(e) => e.preventDefault()}
                         onCopy={(e) => e.preventDefault()}
                         autoComplete="off"
-                        disabled={panVerified && nameMatchOk}
+                        disabled={panVerified || kycLocked}
                         className="w-full border-b-2 border-gray-200 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black transition-colors tracking-widest uppercase disabled:text-gray-400 disabled:border-transparent"
                       />
                     </div>
                     <button
                       type="button"
                       onClick={handlePanVerify}
-                      disabled={panLoading || !formData.pan || formData.pan.length !== 10 || panVerified}
+                      disabled={panLoading || !formData.pan || formData.pan.length !== 10 || panVerified || kycLocked}
                       className="bg-black text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
                     >
-                      {panLoading ? "Verifying…" : panVerified && nameMatchOk ? "Verified ✓" : "Verify PAN"}
+                      {panLoading ? "Verifying…" : panVerified ? "Verified ✔" : "Verify PAN"}
                     </button>
                   </div>
-
                   {panVerified && nameMatchOk && (
                     <p className="text-green-700 text-xs bg-green-50 border border-green-200 rounded px-3 py-1.5">
-                      ✓ Aadhaar ↔ PAN name match confirmed{nameMatchScore !== null ? ` (${nameMatchScore}% similarity)` : ""}.
+                      ✔ Aadhaar ↔ PAN name match confirmed{nameMatchScore !== null ? ` (${nameMatchScore}% similarity)` : ""}.
                     </p>
+                  )}
+
+                  {panVerified && panNotLinked && (
+                    <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 text-xs text-amber-900 space-y-1">
+                      <div className="font-bold flex items-center gap-1.5 text-amber-800">
+                        <span>⚠️</span>
+                        <span>Aadhaar is not linked with your PAN Card</span>
+                      </div>
+                      <p>
+                        Your PAN has been accepted, but records indicate your PAN is not linked to your Aadhaar card.
+                        You can continue with Bank verification and submit this form; your application will be routed to <strong>Accounts (Admin)</strong> for manual approval.
+                      </p>
+                    </div>
                   )}
 
                   {panError && (
@@ -958,7 +1080,7 @@ export default function FormPage() {
                     ? "bg-red-600 text-white"
                     : "bg-gray-400 text-white"
                 }`}>
-                  {bankVerified && bankMatchResult?.passed ? "✓" : bankVerified && !bankMatchResult?.passed ? "✗" : "3"}
+                  {bankVerified && bankMatchResult?.passed ? "✔" : bankVerified && !bankMatchResult?.passed ? "✗" : "3"}
                 </span>
                 <span className="text-xs font-bold text-black">Bank Account Verification</span>
                 {bankVerified && bankMatchResult?.passed && (
@@ -990,7 +1112,7 @@ export default function FormPage() {
                         onPaste={(e) => e.preventDefault()}
                         onCopy={(e) => e.preventDefault()}
                         autoComplete="off"
-                        disabled={bankVerified && bankMatchResult?.passed}
+                        disabled={(bankVerified && bankMatchResult?.passed) || kycLocked}
                         className="w-full border-b-2 border-gray-200 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black transition-colors disabled:text-gray-400 disabled:border-transparent"
                       />
                     </div>
@@ -1011,7 +1133,7 @@ export default function FormPage() {
                         maxLength={11}
                         onPaste={(e) => e.preventDefault()}
                         autoComplete="off"
-                        disabled={bankVerified && bankMatchResult?.passed}
+                        disabled={(bankVerified && bankMatchResult?.passed) || kycLocked}
                         className="w-full border-b-2 border-gray-200 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black uppercase transition-colors disabled:text-gray-400 disabled:border-transparent"
                       />
                     </div>
@@ -1019,10 +1141,10 @@ export default function FormPage() {
                   <button
                     type="button"
                     onClick={handleBankVerify}
-                    disabled={bankLoading || !formData.bankAccountNumber || !formData.bankIfsc || bankVerified && bankMatchResult?.passed}
+                    disabled={bankLoading || !formData.bankAccountNumber || !formData.bankIfsc || (bankVerified && bankMatchResult?.passed) || kycLocked}
                     className="bg-black text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
-                    {bankLoading ? "Verifying…" : bankVerified && bankMatchResult?.passed ? "Verified ✓" : "Verify Bank Account"}
+                    {bankLoading ? "Verifying…" : bankVerified && bankMatchResult?.passed ? "Verified ✔" : "Verify Bank Account"}
                   </button>
 
                   {/* ── Name Match Matrix ──────────────────────────────── */}
@@ -1030,7 +1152,7 @@ export default function FormPage() {
                     <div className={`rounded-lg border p-3 text-xs ${bankMatchResult.passed ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
                       <p className={`font-bold mb-2 ${bankMatchResult.passed ? "text-green-800" : "text-red-800"}`}>
                         {bankMatchResult.passed
-                          ? `✓ Name match passed — ${bankMatchResult.matchCount}/${bankMatchResult.totalPairs} pairs match (≥60%)`
+                          ? `✔ Name match passed — ${bankMatchResult.matchCount}/${bankMatchResult.totalPairs} pairs match (≥60%)`
                           : `✗ Name match failed — only ${bankMatchResult.matchCount}/${bankMatchResult.totalPairs} pairs match (need ≥3)`}
                       </p>
                       {/* Name reference row */}
@@ -1068,7 +1190,7 @@ export default function FormPage() {
                                 />
                               </div>
                               <span className={`font-bold ${p.ok ? "text-green-700" : "text-red-600"}`}>
-                                {p.score}% {p.ok ? "✓" : "✗"}
+                                {p.score}% {p.ok ? "✔" : "✗"}
                               </span>
                             </div>
                           );
@@ -1089,7 +1211,7 @@ export default function FormPage() {
             {/* KYC Status Banner */}
             {kycPassed && (
               <div className="mt-3 bg-green-600 text-white text-xs font-bold text-center py-2 rounded-lg">
-                ✓ KYC Verified — Payee, Aadhaar, PAN &amp; Bank identity confirmed. You may now submit.
+                ✔ KYC Verified — Payee, Aadhaar, PAN &amp; Bank identity confirmed. You may now submit.
               </div>
             )}
           </div>
@@ -1144,3 +1266,9 @@ export default function FormPage() {
     </div>
   );
 }
+
+
+
+
+
+
