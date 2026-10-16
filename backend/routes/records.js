@@ -438,7 +438,7 @@ router.put("/:id/admin-approve", requireAuth, requireRole(["admin"]), async (req
     const record = await Record.findById(req.params.id);
     if (!record) return res.status(404).json({ message: "Record not found" });
 
-    if (!record.formSubmitted) {
+    if (!record.formSubmitted && !record.admin_review_requested && !record.kyc_permanently_locked) {
       return res.status(400).json({ message: "Payee must submit details before Admin approval." });
     }
     
@@ -447,6 +447,8 @@ router.put("/:id/admin-approve", requireAuth, requireRole(["admin"]), async (req
     record.dateOfForwarding = new Date(); // Req 11
     record.admin_review_requested = false;
     record.admin_pan_bypassed = true;
+    record.kyc_permanently_locked = false;
+    record.kycFailed = false;
     // Clear any previous rejection
     record.rejected = false;
     record.rejectedAt = null;
@@ -455,6 +457,82 @@ router.put("/:id/admin-approve", requireAuth, requireRole(["admin"]), async (req
     await record.save();
     
     res.json(record);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PUT /api/records/:id/reset -> Reset form, KYC, and submission so payee can start fresh (Admin-only)
+router.put("/:id/reset", requireAuth, requireRole(["admin"]), async (req, res) => {
+  try {
+    const record = await Record.findById(req.params.id);
+    if (!record) return res.status(404).json({ message: "Record not found" });
+
+    // Reset all KYC fields
+    record.kyc_aadhaar_verified = false;
+    record.kyc_aadhaar_name = null;
+    record.kyc_aadhaar_number = null;
+    record.kyc_aadhaar_ref_id = null;
+
+    record.kyc_pan_verified = false;
+    record.kyc_pan_name = null;
+    record.kyc_pan_number = null;
+    record.kyc_pan_match_score = null;
+
+    record.kyc_bank_verified = false;
+    record.kyc_bank_name = null;
+    record.kyc_bank_account = null;
+    record.kyc_bank_ifsc = null;
+    record.kyc_bank_match = null;
+
+    record.kyc_passed = false;
+    record.kyc_passed_at = null;
+    record.kycFailed = false;
+    record.kyc_failed_attempts = 0;
+    record.pan_invalid_attempts = 0;
+    record.bank_invalid_attempts = 0;
+    record.kyc_permanently_locked = false;
+    record.kyc_locked_until = null;
+
+    record.kyc_name_mismatch = false;
+    record.kyc_name_mismatch_type = null;
+    record.kyc_name_mismatch_details = null;
+    record.kyc_name_mismatch_at = null;
+
+    record.admin_pan_bypassed = false;
+    record.admin_review_requested = false;
+    record.admin_review_reason = null;
+
+    record.pan_not_linked = false;
+    record.pan_aadhaar_linked = false;
+
+    // Reset submission state
+    record.formSubmitted = false;
+    record.payee_status = "pending";
+    record.submittedIp = null;
+    record.formData = {};
+
+    record.pan_number = null;
+    record.beneficiary_name = null;
+    record.account_number = null;
+    record.bank_name = null;
+    record.ifsc_code = null;
+    record.bank_branch_address = null;
+
+    // Reset approvals/rejections
+    record.adminApproved = false;
+    record.adminApprovedAt = null;
+    record.dateOfForwarding = null;
+    record.registrarApproved = false;
+    record.registrarApprovedAt = null;
+    record.dateOfApproval = null;
+    record.rejected = false;
+    record.rejectedAt = null;
+    record.rejectionReason = null;
+    record.rejectedBy = null;
+
+    await record.save();
+    res.json({ message: "Form and KYC details have been reset successfully.", record });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -558,6 +636,8 @@ router.put("/:id/edit", requireAuth, requireRole(["admin"]), async (req, res) =>
       "grand_total", "fellowship_rate", "fellowship_total", "refund_amount_claimed", 
       "payment_receipt_number", "payment_receipt_date", "refund_reason", "academic_year", 
       "category", "services", "amount", "formData",
+      "pan_number", "beneficiary_name", "account_number", "bank_name", "ifsc_code", "bank_branch_address",
+      "kyc_pan_number", "kyc_aadhaar_number", "kyc_aadhaar_name", "kyc_pan_name", "kyc_bank_name",
       "entitled_amount", "entitled_amount_words", "expenditure_debitable_to", "treasurer_signature",
       "participation_payment_certified_by", "received_amount", "received_amount_words", "applicant_signature",
       "passed_for_payment_amount", "passed_for_payment_amount_words", "utr_rrn_reference_number",
@@ -760,6 +840,21 @@ router.put("/:id/edit", requireAuth, requireRole(["admin"]), async (req, res) =>
           record.amountAfterTds = Math.round(record.amount * 0.9 * 100) / 100;
         }
       }
+    }
+
+    if (updates.pan_number || updates.account_number || updates.bank_name || updates.ifsc_code || updates.beneficiary_name || updates.bank_branch_address) {
+      record.formData = {
+        ...(record.formData || {}),
+        pan: record.pan_number || record.formData?.pan,
+        panConfirm: record.pan_number || record.formData?.panConfirm,
+        bankBeneficiaryName: record.beneficiary_name || record.formData?.bankBeneficiaryName,
+        bankAccountNumber: record.account_number || record.formData?.bankAccountNumber,
+        bankAccountNumberConfirm: record.account_number || record.formData?.bankAccountNumberConfirm,
+        bankName: record.bank_name || record.formData?.bankName,
+        bankIfsc: record.ifsc_code || record.formData?.bankIfsc,
+        bankIfscConfirm: record.ifsc_code || record.formData?.bankIfscConfirm,
+        bankBranchAddress: record.bank_branch_address || record.formData?.bankBranchAddress
+      };
     }
 
     await record.save();

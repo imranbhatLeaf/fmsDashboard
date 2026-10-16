@@ -1,0 +1,156 @@
+
+
+--------------------------------------------------------------------------------
+INTEGRATION
+--------------------------------------------------------------------------------
+
+This integration adds a KYC (Know Your Customer) verification step to the
+Payee Completion Form. Before a payee can submit their bank details, they must
+verify their identity using:
+
+  1. Aadhaar OTP (OKYC) — via UIDAI / Cashfree Verification Suite
+  2. PAN Verification   — via Income Tax Department / Cashfree Verification Suite
+
+The names returned from Aadhaar and PAN must MATCH. If they don't match,
+the form is BLOCKED and the payee cannot submit.
+
+
+--------------------------------------------------------------------------------
+. WHO SENDS THE OTP
+--------------------------------------------------------------------------------
+
+The OTP is sent by UIDAI (Government of India) — NOT by Cashfree 
+
+Flow:
+   Server  →  calls Cashfree API  →  Cashfree calls UIDAI
+                                                    ↓
+                              UIDAI sends OTP via SMS to the
+                              mobile number linked with Aadhaar
+
+The SMS appears from "UIDAI" or "mAadhaar" on the payee's phone.
+
+IMPORTANT: The payee must have their current mobile number
+           registered/linked with their Aadhaar.
+
+--------------------------------------------------------------------------------
+ STEP-BY-STEP PAYEE EXPERIENCE
+--------------------------------------------------------------------------------
+
+STEP 1 — Aadhaar Verification (OKYC)
+--------------------------------------
+  a. Payee opens the form link sent to their email
+  b. Payee sees the "Identity Verification (KYC)" section
+  c. Payee types their 12-digit Aadhaar number
+  d. Payee clicks "Send OTP"
+  e. UIDAI sends an OTP SMS to their Aadhaar-registered mobile
+  f. Payee checks their phone and reads the 6-digit OTP
+  g. Payee types the OTP into the form
+  h. Payee clicks "Verify OTP"
+  i. If correct → Aadhaar Verified ✓ (name is fetched from Aadhaar records)
+
+STEP  — PAN Verification
+---------------------------
+  a. PAN input field becomes active after Aadhaar is verified
+  b. Payee types their 10-digit PAN number (e.g. ABCDE1234F)
+  c. Payee clicks "Verify PAN"
+  d. Cashfree fetches the name registered against that PAN
+  e. System compares: Aadhaar Name vs PAN Name
+     - If names MATCH   → PAN Verified ✓ | KYC PASSED ✓
+     - If names MISMATCH → ✗ BLOCKED | Error shown | Cannot submit
+
+
+
+--------------------------------------------------------------------------------
+. FULL TECHNICAL FLOW
+--------------------------------------------------------------------------------
+
+  Finance Portal (Admin)
+        ↓  sends link to payee
+  Payee opens /form/:token
+        ↓
+  [KYC SECTION]
+        ↓
+  Payee enters Aadhaar → POST /api/verify/aadhaar/generate-otp
+        ↓                (Backend → Cashfree → UIDAI)
+  UIDAI sends OTP SMS to payee's phone
+        ↓
+  Payee enters OTP → POST /api/verify/aadhaar/verify-otp
+        ↓             (Backend → Cashfree → UIDAI confirms)
+  Aadhaar Name returned (e.g. "FAISAL MUSHTAQ")
+        ↓
+  Payee enters PAN → POST /api/verify/pan
+        ↓             (Backend → Cashfree → Income Tax Dept)
+  PAN Name returned (e.g. "FAISAL MUSHTAQ")
+        ↓
+  Name Match Check:
+    Aadhaar Name == PAN Name?
+        ↓ YES                    ↓ NO
+  KYC PASSED ✓             BLOCKED ✗
+  Form unlocks             Error shown
+        ↓
+  Payee fills bank details
+        ↓
+  POST /api/form/:token  (final submission)
+        ↓
+  Record saved → Email sent (Stage 2)
+        ↓
+  Payee sees "Form Submitted" confirmation
+
+
+--------------------------------------------------------------------------------
+. WHAT DATA IS USED / STORED?
+--------------------------------------------------------------------------------
+
+  - Aadhaar Number : Used only to trigger OTP. NOT stored in database.
+  - Aadhaar Name   : Used only for name-match comparison. NOT stored.
+  - OTP            : Never stored. Passed directly to Cashfree for verification.
+  - PAN Number     : Stored in record (existing field: pan_number).
+  - PAN Name       : Used only for name-match comparison. NOT stored.
+  - Bank Details   : Stored as before (account_number, ifsc_code, etc.)
+
+
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+. BACKEND API ENDPOINTS
+--------------------------------------------------------------------------------
+
+  POST  /api/verify/aadhaar/generate-otp
+        Body    : { "aadhaar": "123456789012" }
+        Returns : { "success": true, "ref_id": "...", "message": "OTP sent..." }
+
+  POST  /api/verify/aadhaar/verify-otp
+        Body    : { "ref_id": "...", "otp": "123456" }
+        Returns : { "success": true, "aadhaar_name": "FAISAL" }
+
+  POST  /api/verify/pan
+        Body    : { "pan": "ABCDE1234F", "aadhaar_name": "FAISAL" }
+        Returns : { "success": true, "pan_name": "FAISAL",
+                    "name_match": true, "name_match_message": "..." }
+
+
+--------------------------------------------------------------------------------
+
+
+
+--------------------------------------------------------------------------------
+. NAME MATCH LOGIC
+--------------------------------------------------------------------------------
+
+  The system uses a fuzzy word-overlap comparison (not strict exact match)
+  to handle minor spelling differences between Aadhaar and PAN records.
+
+  Example:
+    Aadhaar Name : "RAJESH KUMAR SHARMA"
+    PAN Name     : "RAJESH K SHARMA"
+    Result       : MATCH ✓ (word overlap >= 60%)
+
+    Aadhaar Name : "PRIYA SINGH"
+    PAN Name     : "AMIT VERMA"
+    Result       : MISMATCH ✗ (form blocked)
+
+
+--------------------------------------------------------------------------------
+
+

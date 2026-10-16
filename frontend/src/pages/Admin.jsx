@@ -236,6 +236,32 @@ export default function AdminDashboard() {
     setShowRecordModal(true);
   }
 
+  function openEditModal(record) {
+    setActiveRecord(record);
+    const formType = record.form_type || record.category?.toLowerCase() || "standard";
+    setInitialFormType(formType);
+    setShowRecordModal(true);
+  }
+
+  async function handleAdminReset(id) {
+    if (!window.confirm("Are you sure you want to reset all KYC, Aadhaar, PAN, and Bank details for this record? The payee will be able to fill the form again from scratch.")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/records/${id}/reset`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${auth?.token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to reset record.");
+      alert("Form and KYC details reset successfully.");
+      setRecords((prev) => prev.map((r) => r._id === id ? { ...r, ...data.record } : r));
+      if (previewRecord && previewRecord._id === id) {
+        setPreviewRecord((prev) => ({ ...prev, ...data.record }));
+      }
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
   async function handleSaveRecord(formData) {
     const isAdd = !activeRecord;
     const url = isAdd ? `${API_BASE}/api/records` : `${API_BASE}/api/records/${activeRecord._id}/edit`;
@@ -355,26 +381,23 @@ export default function AdminDashboard() {
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN") : "—";
 
   const getRecordStatus = (r) => {
-    if (r.kycFailed) return "KYC Failed";
     if (r.rejected) return "Rejected";
     if (r.paymentProcessed) return "Paid";
     if (r.registrarApproved) return "Approved by Registrar, Pending for Payment";
     if (r.adminApproved) return "Pending Registrar Approval";
     if (r.kyc_permanently_locked) return "KYC Blocked (Permanent)";
-    if (r.kyc_locked_until && new Date() < new Date(r.kyc_locked_until)) {
-      const hoursLeft = Math.ceil((new Date(r.kyc_locked_until) - new Date()) / (1000 * 60 * 60));
-      return `KYC Locked (${hoursLeft}h)`;
+    if (r.kycFailed) return "KYC Failed";
+
+    if (r.formSubmitted) {
+      if (r.kyc_name_mismatch) return "Approval Pending (Mismatch)";
+      if (r.pan_not_linked) return "PAN Approval Pending";
+      if (r.admin_review_requested) return "Approval Pending";
+      return "Pending Registrar Approval";
     }
 
-    // If PAN is not linked to Aadhaar (or review requested) and form is submitted:
-    // goes to Admin for regular Admin approval flow!
-    if (r.formSubmitted && (r.pan_not_linked || r.admin_review_requested)) {
-      return "Approval Pending";
-    }
+    if (r.pan_not_linked) return "PAN Approval Pending";
+    if (r.admin_review_requested) return "Approval Pending";
 
-    if (r.admin_review_requested) return "PAN Approval Pending";
-
-    if (r.formSubmitted) return "Pending Registrar Approval";
     return "Form Pending";
   };
 
@@ -694,7 +717,7 @@ export default function AdminDashboard() {
                                   ? { background: "#ecfdf5", color: "#047857", borderColor: "#a7f3d0" }
                                   : status === "Rejected" || status.includes("KYC")
                                   ? { background: "#fef2f2", color: "#dc2626", borderColor: "#fca5a5" }
-                                  : status === "Approved by Registrar, Pending for Payment" || status === "Approval Pending"
+                                  : status === "Approved by Registrar, Pending for Payment" || status.startsWith("Approval Pending")
                                   ? { background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }
                                   : status === "Pending Registrar Approval" || status === "PAN Approval Pending"
                                   ? { background: "#fffbeb", color: "#b45309", borderColor: "#fde68a" }
@@ -722,7 +745,7 @@ export default function AdminDashboard() {
                                 {status === "Pending Registrar Approval" && (r.adminApprovedAt || r.dateOfForwarding) && (
     <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.adminApprovedAt || r.dateOfForwarding)}</div>
   )}
-  {status === "Approval Pending" && r.dateOfUpload && (
+  {status.startsWith("Approval Pending") && r.dateOfUpload && (
     <div className="text-[9px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{fmtDate(r.dateOfUpload)}</div>
   )}
 </span>
@@ -736,32 +759,65 @@ export default function AdminDashboard() {
                                 Preview
                               </button>
 
+                              {(() => {
+                                const isCleanRegistrarStage = status === "Pending Registrar Approval" || status === "Approved by Registrar, Pending for Payment";
+                                const canEdit = !r.paymentProcessed && !isCleanRegistrarStage;
+                                const canApproveOrReject = !r.adminApproved && !r.rejected && !r.paymentProcessed && !isCleanRegistrarStage && (
+                                  status.startsWith("Approval Pending") ||
+                                  r.kyc_permanently_locked
+                                );
+                                const isPurePanNotLinked = r.pan_not_linked && !r.kyc_name_mismatch && !r.kyc_permanently_locked && !r.rejected && !(r.pan_invalid_attempts > 0) && !(r.bank_invalid_attempts > 0);
+                                const hasIssueToReset = r.kyc_permanently_locked || r.kyc_name_mismatch || r.rejected || (r.pan_invalid_attempts > 0) || (r.bank_invalid_attempts > 0);
+                                const canReset = !isPurePanNotLinked && hasIssueToReset && !isCleanRegistrarStage && !r.paymentProcessed;
 
-                              {status === "Approval Pending" && (
-                                <>
-                                  <button
-                                    onClick={() => openAdminApproveModal(r)}
-                                    className="text-[11px] font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 px-1.5 py-0.5 rounded transition-colors shadow-sm"
-                                  >
-                                    Approve
-                                  </button>
-                                  <button
-                                    onClick={() => handleAdminReject(r._id)}
-                                    className="text-[11px] font-bold uppercase tracking-wider text-red-600 px-1.5 py-0.5 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
-                                  >
-                                    Reject
-                                  </button>
-                                </>
+                                return (
+                                  <>
+                                    {canEdit && (
+                                      <button
+                                        onClick={() => openEditModal(r)}
+                                        className="text-[11px] font-bold uppercase tracking-wider text-gray-700 border border-gray-300 hover:bg-gray-100 px-1.5 py-0.5 rounded transition-colors shadow-sm bg-white"
+                                      >
+                                        Edit
+                                      </button>
+                                    )}
+                                    {canApproveOrReject && (
+                                      <>
+                                        <button
+                                          onClick={() => openAdminApproveModal(r)}
+                                          className="text-[11px] font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 px-1.5 py-0.5 rounded transition-colors shadow-sm"
+                                        >
+                                          Accept
+                                        </button>
+                                        <button
+                                          onClick={() => handleAdminReject(r._id)}
+                                          className="text-[11px] font-bold uppercase tracking-wider text-red-600 px-1.5 py-0.5 rounded border border-red-300 transition-colors hover:bg-red-50 bg-white shadow-sm"
+                                        >
+                                          Reject
+                                        </button>
+                                      </>
+                                    )}
+                                    {canReset && (
+                                      <button
+                                        onClick={() => handleAdminReset(r._id)}
+                                        className="text-[11px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded transition-colors shadow-sm"
+                                        title="Reset all KYC, documents & locks for this payee"
+                                      >
+                                        Reset
+                                      </button>
+                                    )}
+                                  </>
+                                );
+                              })()}
+
+                              {status === "PAN Approval Pending" && (
+                                <button
+                                  onClick={() => handleApprovePanBypass(r._id)}
+                                  className="text-[11px] font-bold uppercase tracking-wider text-white bg-orange-500 hover:bg-orange-600 px-1.5 py-0.5 rounded transition-colors shadow-sm"
+                                >
+                                  Approve PAN
+                                </button>
                               )}
-                                                              {status === "PAN Approval Pending" && (
-                                  <button
-                                    onClick={() => handleApprovePanBypass(r._id)}
-                                    className="text-[11px] font-bold uppercase tracking-wider text-white bg-orange-500 hover:bg-orange-600 px-1.5 py-0.5 rounded transition-colors shadow-sm"
-                                  >
-                                    Approve PAN
-                                  </button>
-                                )}
-                                {status === "Pending Registrar Approval" && (
+                              {status === "Pending Registrar Approval" && (
                                 <span className="text-[11px] text-gray-400 italic">Awaiting Registrar</span>
                               )}
                               {status === "Approved by Registrar, Pending for Payment" && (
@@ -799,6 +855,7 @@ export default function AdminDashboard() {
         <RecordModal
           record={activeRecord}
           defaultFormType={initialFormType}
+          initialEditing={!!activeRecord}
           onClose={() => setShowRecordModal(false)}
           onSave={handleSaveRecord}
         />
@@ -808,6 +865,44 @@ export default function AdminDashboard() {
         <PreviewModal
           record={previewRecord}
           onClose={() => setPreviewRecord(null)}
+          onEdit={(() => {
+            const status = getRecordStatus(previewRecord);
+            const isCleanRegistrarStage = status === "Pending Registrar Approval" || status === "Approved by Registrar, Pending for Payment";
+            if (previewRecord.paymentProcessed || isCleanRegistrarStage) return null;
+            return (rec) => {
+              setPreviewRecord(null);
+              openEditModal(rec);
+            };
+          })()}
+          onAccept={(rec) => {
+            setPreviewRecord(null);
+            openAdminApproveModal(rec);
+          }}
+          onReject={(id) => {
+            setPreviewRecord(null);
+            handleAdminReject(id);
+          }}
+          onReset={(id) => {
+            setPreviewRecord(null);
+            handleAdminReset(id);
+          }}
+          canReset={(() => {
+            const r = previewRecord;
+            const status = getRecordStatus(r);
+            const isCleanRegistrarStage = status === "Pending Registrar Approval" || status === "Approved by Registrar, Pending for Payment";
+            const isPurePanNotLinked = r.pan_not_linked && !r.kyc_name_mismatch && !r.kyc_permanently_locked && !r.rejected && !(r.pan_invalid_attempts > 0) && !(r.bank_invalid_attempts > 0);
+            const hasIssueToReset = r.kyc_permanently_locked || r.kyc_name_mismatch || r.rejected || (r.pan_invalid_attempts > 0) || (r.bank_invalid_attempts > 0);
+            return !isPurePanNotLinked && hasIssueToReset && !isCleanRegistrarStage && !r.paymentProcessed;
+          })()}
+          canApproveOrReject={(() => {
+            const r = previewRecord;
+            const status = getRecordStatus(r);
+            const isCleanRegistrarStage = status === "Pending Registrar Approval" || status === "Approved by Registrar, Pending for Payment";
+            return !r.adminApproved && !r.rejected && !r.paymentProcessed && !isCleanRegistrarStage && (
+              status.startsWith("Approval Pending") ||
+              r.kyc_permanently_locked
+            );
+          })()}
         />
       )}
 

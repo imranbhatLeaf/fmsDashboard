@@ -202,8 +202,12 @@ router.get("/:token", rateLimiter, async (req, res) => {
     } else if (record.adminApproved) {
       approvalStatus = "Approved by Accounts (Admin), Pending Registrar Approval";
     } else if (record.formSubmitted) {
-      if (record.pan_not_linked || record.admin_review_requested) {
+      if (record.kyc_name_mismatch) {
+        approvalStatus = "Pending Accounts (Admin) Review — Name/document mismatch detected, manual verification required";
+      } else if (record.pan_not_linked) {
         approvalStatus = "Pending Accounts (Admin) Approval (Aadhaar not linked with PAN)";
+      } else if (record.admin_review_requested) {
+        approvalStatus = "Pending Accounts (Admin) Review";
       } else {
         approvalStatus = "Pending Registrar Approval";
       }
@@ -252,6 +256,7 @@ router.get("/:token", rateLimiter, async (req, res) => {
       kyc_aadhaar_verified: record.kyc_aadhaar_verified,
       kyc_aadhaar_name: record.kyc_aadhaar_name,
       kyc_aadhaar_ref_id: record.kyc_aadhaar_ref_id,
+      kyc_aadhaar_number: record.kyc_aadhaar_number,
       kyc_pan_verified: record.kyc_pan_verified,
       kyc_pan_name: record.kyc_pan_name,
       kyc_pan_number: record.kyc_pan_number,
@@ -262,9 +267,13 @@ router.get("/:token", rateLimiter, async (req, res) => {
       kyc_bank_ifsc: record.kyc_bank_ifsc,
       kyc_bank_match: record.kyc_bank_match,
       kyc_passed: record.kyc_passed,
-      
+      // Name mismatch / different person flags
+      kyc_name_mismatch: record.kyc_name_mismatch || false,
+      kyc_name_mismatch_type: record.kyc_name_mismatch_type || null,
+      kyc_name_mismatch_details: record.kyc_name_mismatch_details || null,
       kyc_failed_attempts: record.kyc_failed_attempts || 0,
-      kyc_locked_until: record.kyc_locked_until,
+      pan_invalid_attempts: record.pan_invalid_attempts || 0,
+      bank_invalid_attempts: record.bank_invalid_attempts || 0,
       kyc_permanently_locked: record.kyc_permanently_locked || false,
       admin_pan_bypassed: record.admin_pan_bypassed || false,
       admin_review_requested: record.admin_review_requested || false,
@@ -365,6 +374,17 @@ router.post("/:token", rateLimiter, async (req, res) => {
     record.formSubmitted = true;
     record.payee_status = "completed";
     record.submittedIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "0.0.0.0";
+    
+    // Route to admin for review ONLY if there is a mismatch or PAN not linked
+    if (record.kyc_name_mismatch) {
+      record.admin_review_requested = true;
+      record.admin_review_reason = "Name mismatch between payee and KYC documents";
+    } else if (record.pan_not_linked) {
+      record.admin_review_requested = true;
+      record.admin_review_reason = "PAN not linked with Aadhaar";
+    } else {
+      record.admin_review_requested = false;
+    }
     
     await record.save();
 

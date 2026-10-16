@@ -160,7 +160,7 @@ const HONORARIUM_FIELDS_SPEC = {
   ]
 };
 
-export default function RecordModal({ record, onClose, onSave, defaultFormType }) {
+export default function RecordModal({ record, onClose, onSave, defaultFormType, initialEditing = false }) {
   const isAdd = !record;
   const [selectedFormType, setSelectedFormType] = useState(
     record?.form_type === 'refund' || record?.category === 'Refund' 
@@ -175,8 +175,11 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
       ? 'salary'
       : (defaultFormType || 'standard')
   );
-  const [isEditing, setIsEditing] = useState(isAdd);
-  const [formData, setFormData] = useState(record || {});
+  const [isEditing, setIsEditing] = useState(isAdd || initialEditing);
+  const [formData, setFormData] = useState({
+    ...(record?.formData || {}),
+    ...(record || {}),
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -397,6 +400,11 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
         }
         dataToSave.form_type = 'tada';
         dataToSave.category = 'TA/DA';
+        dataToSave.name = formData.name;
+        dataToSave.email = formData.email;
+        dataToSave.designation = formData.designation;
+        dataToSave.pay_level = formData.pay_level;
+        dataToSave.address = formData.address;
         dataToSave.programme_nature = formData.nature_of_programme || formData.programme_nature;
         dataToSave.programme_title = formData.title_of_programme || formData.programme_title;
         dataToSave.nature_of_programme = dataToSave.programme_nature;
@@ -564,6 +572,7 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
           return;
         }
       }
+
       await onSave(dataToSave);
     } catch (err) {
       setError(err.message || "Failed to save record.");
@@ -1114,6 +1123,8 @@ export default function RecordModal({ record, onClose, onSave, defaultFormType }
                     {CSV_FIELDS.map(field => renderInputField(field))}
                   </div>
                 )}
+
+
 
                 {error && <p className="text-red-600 text-sm font-semibold">{error}</p>}
                 

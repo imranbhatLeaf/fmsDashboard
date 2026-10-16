@@ -3,7 +3,16 @@ import React from 'react';
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString() : "-";
 const fmtTime = (d) => d ? new Date(d).toLocaleTimeString() : "-";
 
-export default function PreviewModal({ record, onClose }) {
+export default function PreviewModal({ 
+  record, 
+  onClose,
+  onEdit,
+  onAccept,
+  onReject,
+  onReset,
+  canReset = false,
+  canApproveOrReject = false
+}) {
   if (!record) return null;
 
   const gross = Number(record.amount);
@@ -103,29 +112,92 @@ export default function PreviewModal({ record, onClose }) {
             </div>
           )}
 
+          {/* Document Mismatch Notice */}
+          {record.kyc_name_mismatch && (
+            <div className="bg-orange-50 border border-orange-400 p-4 rounded-lg text-xs text-orange-950 space-y-2 shadow-sm">
+              <div className="font-bold flex items-center gap-1.5 text-orange-800 text-sm">
+                <span>⚠️</span>
+                <span>Document Name Mismatch (Accepted by Payee)</span>
+              </div>
+              <p className="text-gray-700">
+                The payee submitted documents belonging to a different person and accepted the conditions. Manual verification and approval by Admin is required.
+              </p>
+              <div className="bg-white/90 p-2.5 rounded border border-orange-200 grid grid-cols-2 gap-2 text-[11px] mt-1">
+                <div><span className="text-gray-500 block text-[10px] uppercase font-bold">Payee Name</span><strong>{record.name}</strong></div>
+                <div><span className="text-gray-500 block text-[10px] uppercase font-bold">Aadhaar Name</span><strong>{record.kyc_aadhaar_name || "—"}</strong></div>
+                <div><span className="text-gray-500 block text-[10px] uppercase font-bold">PAN Name</span><strong>{record.kyc_pan_name || "—"}</strong></div>
+                <div><span className="text-gray-500 block text-[10px] uppercase font-bold">Bank Name</span><strong>{record.kyc_bank_name || "—"}</strong></div>
+              </div>
+            </div>
+          )}
+
+          {/* KYC Permanently Locked Alert */}
+          {record.kyc_permanently_locked && (
+            <div className="bg-red-50 border border-red-300 p-3 rounded-lg text-xs text-red-800 font-semibold flex items-center gap-2">
+              <span className="text-base">🔒</span>
+              <div>
+                <span>KYC Permanently Locked:</span> Payee exceeded maximum invalid attempts (PAN / Bank). Admin can Reset the form to unlock.
+              </div>
+            </div>
+          )}
+
           {/* User Details */}
           <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">User Details</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Name</span><span className="font-medium">{record.name}</span></div>
+            <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">Payee &amp; Identity Verification (KYC)</h3>
+            <div className="space-y-2.5 text-sm">
+              <div className="flex justify-between"><span className="text-gray-500">Payee Name</span><span className="font-medium">{record.name}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Email</span><span>{record.email}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Phone</span><span>{formData.mobile || record.phoneMobile || record.phone_mobile || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">PAN</span><span>{record.kyc_pan_number || formData.pan || record.pan || record.pan_number || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Aadhaar No.</span><span>{record.kyc_aadhaar_number || "—"}</span></div>
-              {record.kyc_aadhaar_name && (
-                <div className="flex justify-between"><span className="text-gray-500">Aadhaar Name</span><span>{record.kyc_aadhaar_name}</span></div>
+              {record.designation && (
+                <div className="flex justify-between"><span className="text-gray-500">Designation</span><span>{record.designation}</span></div>
               )}
+              {record.address && (
+                <div className="flex justify-between"><span className="text-gray-500">Address</span><span className="text-right max-w-[220px]">{record.address}</span></div>
+              )}
+
+              {/* 1. Aadhaar */}
+              <div className="border-t border-gray-100 pt-2 space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">1. Aadhaar Verification</p>
+                <div className="flex justify-between"><span className="text-gray-500">Aadhaar No.</span><span className="font-mono">{record.kyc_aadhaar_number || "—"}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Name on Aadhaar</span><span className="font-medium">{record.kyc_aadhaar_name || "—"}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Status</span><span className={`font-semibold text-xs px-2 py-0.5 rounded-full ${record.kyc_aadhaar_verified ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>{record.kyc_aadhaar_verified ? "Verified (OKYC) ✔" : "Pending"}</span></div>
+              </div>
+
+              {/* 2. PAN */}
+              <div className="border-t border-gray-100 pt-2 space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">2. PAN Verification</p>
+                <div className="flex justify-between"><span className="text-gray-500">PAN Number</span><span className="font-mono font-medium">{record.kyc_pan_number || formData.pan || record.pan || record.pan_number || "—"}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Name on PAN</span><span className="font-medium">{record.kyc_pan_name || "—"}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Aadhaar-PAN Link</span><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${record.pan_not_linked ? "bg-amber-100 text-amber-800" : record.pan_aadhaar_linked ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>{record.pan_not_linked ? "⚠️ Not Linked" : (record.pan_aadhaar_linked ? "Linked ✔" : "—")}</span></div>
+                {record.kyc_pan_match_score !== null && record.kyc_pan_match_score !== undefined && (
+                  <div className="flex justify-between"><span className="text-gray-500">Name Match Score</span><span>{record.kyc_pan_match_score}%</span></div>
+                )}
+                <div className="flex justify-between"><span className="text-gray-500">Status</span><span className={`font-semibold text-xs px-2 py-0.5 rounded-full ${record.kyc_pan_verified ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>{record.kyc_pan_verified ? "Verified ✔" : "Pending"}</span></div>
+                {Number(record.pan_invalid_attempts) > 0 && (
+                  <div className="flex justify-between text-xs text-amber-700"><span>Invalid Attempts</span><span>{record.pan_invalid_attempts} / 2</span></div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Bank Details */}
           <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-            <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">Bank Details</h3>
+            <h3 className="text-xs font-bold uppercase border-b border-gray-100 pb-2 mb-3">3. Bank Account Details</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-gray-500">Bank Name</span><span className="font-medium">{formData.bankName || record.bank_name || record.bankName || "—"}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Account No.</span><span className="font-mono">{formData.bankAccountNumber || record.account_number || record.bankAccountNumber || "—"}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">IFSC</span><span className="font-mono">{formData.bankIfsc || record.ifsc_code || record.bankIfsc || "—"}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Beneficiary</span><span>{formData.bankBeneficiaryName || record.beneficiary_name || record.bankBeneficiaryName || "—"}</span></div>
+              {record.kyc_bank_name && (
+                <div className="flex justify-between"><span className="text-gray-500">Name at Bank</span><span className="font-medium">{record.kyc_bank_name}</span></div>
+              )}
+              {(formData.bankBranchAddress || record.bank_branch_address) && (
+                <div className="flex justify-between"><span className="text-gray-500">Branch Address</span><span className="text-right max-w-[220px]">{formData.bankBranchAddress || record.bank_branch_address}</span></div>
+              )}
+              <div className="flex justify-between"><span className="text-gray-500">Status</span><span className={`font-semibold text-xs px-2 py-0.5 rounded-full ${record.kyc_bank_verified ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>{record.kyc_bank_verified ? "Verified ✔" : "Pending"}</span></div>
+              {Number(record.bank_invalid_attempts) > 0 && (
+                <div className="flex justify-between text-xs text-amber-700"><span>Invalid Attempts</span><span>{record.bank_invalid_attempts} / 2</span></div>
+              )}
             </div>
           </div>
 
@@ -222,8 +294,49 @@ export default function PreviewModal({ record, onClose }) {
             </div>
           )}
 
-
         </div>
+
+        {/* Admin Quick Action Footer */}
+        {(onEdit || (canReset && onReset) || (canApproveOrReject && (onAccept || onReject))) && (
+          <div className="p-4 bg-white border-t border-gray-200 flex items-center justify-between gap-2 sticky bottom-0 z-20 print:hidden shadow-lg">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {onEdit && (
+                <button
+                  onClick={() => { onClose(); onEdit(record); }}
+                  className="text-xs font-bold uppercase tracking-wider text-black bg-gray-100 hover:bg-gray-200 border border-gray-300 px-3 py-1.5 rounded transition-colors shadow-sm"
+                >
+                  Edit
+                </button>
+              )}
+              {canReset && onReset && (
+                <button
+                  onClick={() => { onReset(record._id); }}
+                  className="text-xs font-bold uppercase tracking-wider text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded transition-colors shadow-sm"
+                >
+                  Reset Form
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              {canApproveOrReject && onReject && (
+                <button
+                  onClick={() => { onClose(); onReject(record._id); }}
+                  className="text-xs font-bold uppercase tracking-wider text-red-600 bg-white hover:bg-red-50 border border-red-300 px-3 py-1.5 rounded transition-colors shadow-sm"
+                >
+                  Reject
+                </button>
+              )}
+              {canApproveOrReject && onAccept && (
+                <button
+                  onClick={() => { onClose(); onAccept(record); }}
+                  className="text-xs font-bold uppercase tracking-wider text-white bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded transition-colors shadow-sm"
+                >
+                  Accept
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

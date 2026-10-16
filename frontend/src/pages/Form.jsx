@@ -122,12 +122,12 @@ function RadioGroup({ label, name, value, onChange, required, options }) {
 }
 
 // Honorarium form fields
-function HonorariumFields({ data, onChange }) {
+function HonorariumFields({ data, onChange, meta = {} }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div><strong>Nature of Programme:</strong> {meta.programme_nature || meta.nature_of_programme || "—"}</div>
-            <div><strong>Title of Programme:</strong> {meta.programme_title || meta.title_of_programme || "—"}</div>
+        <div><strong>Nature of Programme:</strong> {meta?.programme_nature || meta?.nature_of_programme || "—"}</div>
+        <div><strong>Title of Programme:</strong> {meta?.programme_title || meta?.title_of_programme || "—"}</div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <RadioGroup label="Nature of Participation" name="natureOfParticipation" value={data.natureOfParticipation} onChange={onChange} required options={["Expert", "Resource Person"]} />
@@ -361,6 +361,7 @@ export default function FormPage() {
   const [aadhaarStep, setAadhaarStep] = useState("input"); // "input" | "otp" | "done"
   const [aadhaarLoading, setAadhaarLoading] = useState(false);
   const [aadhaarError, setAadhaarError] = useState(null);
+  const [aadhaarRetryCountdown, setAadhaarRetryCountdown] = useState(0); // countdown (seconds) after UIDAI 503
 
   // Step 2: PAN
   const [panVerified, setPanVerified] = useState(false);
@@ -379,12 +380,21 @@ export default function FormPage() {
   const [bankLoading, setBankLoading] = useState(false);
   const [bankError, setBankError] = useState(null);
   const [bankMatchResult, setBankMatchResult] = useState(null); // best-2-of-3 result
+  const [bankMismatchDifferentPerson, setBankMismatchDifferentPerson] = useState(false);
 
-  // KYC Lock State
+  // Attempt counters (invalid docs — max 2)
+  const [panInvalidAttempts, setPanInvalidAttempts] = useState(0);
+  const [bankInvalidAttempts, setBankInvalidAttempts] = useState(0);
+  const MAX_INVALID_ATTEMPTS = 2;
+
+  // Name mismatch / different person flags (persisted across refresh)
+  const [panMismatchDifferentPerson, setPanMismatchDifferentPerson] = useState(false);
+
+  // KYC Lock State (permanent only — no more time-based locks)
   const [kycLocked, setKycLocked] = useState(false);
   const [kycLockMessage, setKycLockMessage] = useState(null);
 
-  // KYC fully passed = all 3 verified + best-2-of-3 name match passed
+  // KYC fully passed = all 3 verified (even if name mismatch flagged for admin — admin will review)
   const kycPassed = aadhaarVerified && panVerified && nameMatchOk === true && bankVerified && bankMatchResult?.passed === true;
 
   useEffect(() => {
@@ -400,11 +410,18 @@ export default function FormPage() {
 
         if (data.kyc_permanently_locked) {
           setKycLocked(true);
-          setKycLockMessage("KYC is permanently blocked due to too many failed name matches.");
-        } else if (data.kyc_locked_until && new Date() < new Date(data.kyc_locked_until)) {
-          setKycLocked(true);
-          const hoursLeft = Math.ceil((new Date(data.kyc_locked_until) - new Date()) / (1000 * 60 * 60));
-          setKycLockMessage(`KYC is currently locked for ${hoursLeft} more hours due to previous mismatches.`);
+          setKycLockMessage("This form has been permanently locked due to too many failed attempts. Please contact the accounts section.");
+        }
+        // No 24h/48h time-based lock check anymore
+
+        // Restore attempt counts on refresh
+        if (data.pan_invalid_attempts) setPanInvalidAttempts(data.pan_invalid_attempts);
+        if (data.bank_invalid_attempts) setBankInvalidAttempts(data.bank_invalid_attempts);
+
+        // Restore name mismatch flags on refresh
+        if (data.kyc_name_mismatch) {
+          if (data.kyc_name_mismatch_type === "pan") setPanMismatchDifferentPerson(true);
+          if (data.kyc_name_mismatch_type === "bank") setBankMismatchDifferentPerson(true);
         }
 
         setFormData({
@@ -433,6 +450,9 @@ export default function FormPage() {
         } else if (data.kyc_aadhaar_ref_id) {
           setAadhaarRefId(data.kyc_aadhaar_ref_id);
           setAadhaarStep("otp");
+        }
+        if (data.kyc_aadhaar_number) {
+          setAadhaar(data.kyc_aadhaar_number);
         }
         if (data.admin_review_requested || data.pan_not_linked) {
           setPanNotLinked(true);
@@ -476,6 +496,15 @@ export default function FormPage() {
     fetchMeta();
   }, [token]);
 
+  // ── Retry countdown timer (60s cooldown to prevent UIDAI rate limits) ──────
+  useEffect(() => {
+    if (aadhaarRetryCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setAadhaarRetryCountdown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [aadhaarRetryCountdown]);
+
   function handleChange(e) {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -484,9 +513,13 @@ export default function FormPage() {
   // ── KYC Handlers ───────────────────────────────────────────────────────────
 
   async function handleAadhaarGenerateOtp() {
+    if (aadhaarRetryCountdown > 0) return;
     setAadhaarError(null);
-    if (!/^\d{12}$/.test(aadhaar.trim())) {
-      setAadhaarError("Please enter a valid 12-digit Aadhaar number.");
+    setAadhaarOtp("");
+    const aadhaarToUse = (aadhaar || meta?.kyc_aadhaar_number || "").trim();
+    if (!/^\d{12}$/.test(aadhaarToUse)) {
+      setAadhaarStep("input");
+      setAadhaarError("Please enter your 12-digit Aadhaar number.");
       return;
     }
     setAadhaarLoading(true);
@@ -494,18 +527,24 @@ export default function FormPage() {
       const res = await fetch(`${API_BASE}/api/verify/aadhaar/generate-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aadhaar: aadhaar.trim(), token }),
+        body: JSON.stringify({ aadhaar: aadhaarToUse, token }),
       });
       const data = await res.json();
       if (!res.ok) {
-        if (data.message && data.message.includes("Otp generated for this aadhaar")) {
+        if (data.message && data.message.toLowerCase().includes("otp generated")) {
           setAadhaarStep("otp");
-          if (data.ref_id) setAadhaarRefId(data.ref_id);
+          if (data.ref_id) {
+            setAadhaarRefId(data.ref_id);
+            setMeta((prev) => prev ? { ...prev, kyc_aadhaar_ref_id: data.ref_id, kyc_aadhaar_number: aadhaarToUse } : prev);
+          }
+          setAadhaarRetryCountdown(45);
         }
         throw new Error(data.message || "Failed to send OTP.");
       }
       setAadhaarRefId(data.ref_id);
+      setMeta((prev) => prev ? { ...prev, kyc_aadhaar_ref_id: data.ref_id, kyc_aadhaar_number: aadhaarToUse } : prev);
       setAadhaarStep("otp");
+      setAadhaarRetryCountdown(60);
     } catch (err) {
       setAadhaarError(err.message);
     } finally {
@@ -519,19 +558,44 @@ export default function FormPage() {
       setAadhaarError("OTP must be exactly 6 digits.");
       return;
     }
+    const refIdToUse = aadhaarRefId || meta?.kyc_aadhaar_ref_id;
+    if (!refIdToUse) {
+      setAadhaarStep("input");
+      setAadhaarRetryCountdown(0);
+      setAadhaarError("No active OTP session. Please click 'Send OTP' to receive a fresh OTP.");
+      return;
+    }
     setAadhaarLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/verify/aadhaar/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ref_id: aadhaarRefId, otp: aadhaarOtp.trim(), token }),
+        body: JSON.stringify({ ref_id: refIdToUse, otp: aadhaarOtp.trim(), token }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "OTP verification failed.");
+      if (!res.ok) {
+        // UIDAI gateway busy (502/503) — show message and allow user to retry
+        if (data.retryable) {
+          setAadhaarError(data.message || "⚠ UIDAI server is busy. Your OTP is still valid — please wait a few seconds and click 'Verify OTP' again.");
+          return;
+        }
+        // OTP session expired — clear stale ref_id and return to input step
+        if (data.sessionExpired) {
+          setAadhaarRefId(null);
+          setAadhaarOtp("");
+          setAadhaarRetryCountdown(0);
+          setMeta((prev) => prev ? { ...prev, kyc_aadhaar_ref_id: null } : prev);
+          setAadhaarStep("input");
+          setAadhaarError("⏱ Your OTP session has expired. Please click 'Send OTP' to receive a new OTP.");
+          return;
+        }
+        throw new Error(data.message || "OTP verification failed.");
+      }
       setAadhaarName(data.aadhaar_name);
       setAadhaarVerified(true);
       setAadhaarStep("done");
-      // Aut!fill beneficiary name from Aadhaar name
+      setAadhaarRetryCountdown(0);
+      // Autofill beneficiary name from Aadhaar name
       setFormData((prev) => ({ ...prev, bankBeneficiaryName: data.aadhaar_name }));
     } catch (err) {
       setAadhaarError(err.message);
@@ -544,6 +608,7 @@ export default function FormPage() {
     setPanError(null);
     setNameMatchOk(null);
     setNameMatchScore(null);
+    setPanMismatchDifferentPerson(false);
     const pan = formData.pan?.trim();
     const PAN_REGEX = /^[A-Za-z]{5}[0-9]{4}[A-Za-z]{1}$/;
     if (!pan || !PAN_REGEX.test(pan)) {
@@ -562,18 +627,39 @@ export default function FormPage() {
         body: JSON.stringify({ pan, aadhaar_name: aadhaarName, token }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "PAN verification failed.");
+      if (!res.ok) {
+        if (data.pan_mismatch) {
+          // Invalid PAN details — increment attempt counter, show remaining
+          const newCount = panInvalidAttempts + 1;
+          setPanInvalidAttempts(newCount);
+          const remaining = MAX_INVALID_ATTEMPTS - newCount;
+          if (remaining <= 0 || data.message?.toLowerCase().includes("locked")) {
+            setKycLocked(true);
+            setKycLockMessage(data.message);
+          } else {
+            setPanError(`${data.message} — You have ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.`);
+          }
+          return;
+        }
+        throw new Error(data.message || "PAN verification failed.");
+      }
       setPanName(data.pan_name);
       setPanVerified(true);
       setFormData(prev => ({ ...prev, panConfirm: pan }));
-      setNameMatchOk(data.name_match);
+      setNameMatchOk(data.name_match ?? true);
       setNameMatchScore(data.name_match_score ?? null);
-      if (data.pan_not_linked) {
+
+      if (data.name_mismatch_different_person) {
+        // Different person's docs — flag it, disable PAN field, allow form to proceed
+        setPanMismatchDifferentPerson(true);
+        setPanError(null); // Not an error — it's a warning
+      } else if (data.pan_not_linked) {
         setPanNotLinked(true);
       } else {
         setPanNotLinked(false);
       }
-      if (data.name_match === false) {
+
+      if (data.name_match === false && !data.name_mismatch_different_person) {
         setPanError(data.name_match_message);
       }
     } catch (err) {
@@ -586,7 +672,7 @@ export default function FormPage() {
         setPanError(null);
       } else {
         setPanError(err.message);
-        if (err.message.includes("locked")) {
+        if (err.message && err.message.toLowerCase().includes("locked")) {
           setKycLocked(true);
           setKycLockMessage(err.message);
         }
@@ -618,6 +704,7 @@ export default function FormPage() {
     setBankError(null);
     setBankVerified(false);
     setBankMatchResult(null);
+    setBankMismatchDifferentPerson(false);
     const accountNumber = formData.bankAccountNumber?.trim();
     const ifsc = formData.bankIfsc?.trim();
 
@@ -648,17 +735,37 @@ export default function FormPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Bank account verification failed.");
+      if (!res.ok) {
+        if (data.bank_invalid) {
+          // Invalid account — increment attempt counter, show remaining
+          const newCount = bankInvalidAttempts + 1;
+          setBankInvalidAttempts(newCount);
+          const remaining = MAX_INVALID_ATTEMPTS - newCount;
+          if (remaining <= 0 || data.message?.toLowerCase().includes("locked")) {
+            setKycLocked(true);
+            setKycLockMessage(data.message);
+          } else {
+            setBankError(`${data.message} — You have ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.`);
+          }
+          return;
+        }
+        throw new Error(data.message || "Bank account verification failed.");
+      }
       setBankName(data.bank_name);
       setBankVerified(true);
       setFormData(prev => ({ ...prev, bankAccountNumberConfirm: accountNumber, bankIfscConfirm: ifsc }));
       setBankMatchResult(data.match);
-      if (data.match && !data.match.passed) {
+
+      if (data.bank_mismatch_different_person) {
+        // Different person's bank — flag it, disable bank fields, allow form to admin
+        setBankMismatchDifferentPerson(true);
+        setBankError(null); // warning not error
+      } else if (data.match && !data.match.passed) {
         setBankError(data.message);
       }
     } catch (err) {
       setBankError(err.message);
-      if (err.message.includes("locked")) {
+      if (err.message && err.message.toLowerCase().includes("locked")) {
         setKycLocked(true);
         setKycLockMessage(err.message);
       }
@@ -801,8 +908,22 @@ export default function FormPage() {
             <span className="text-xs font-bold text-black">{status}</span>
           </div>
 
-          {(panNotLinked || meta?.pan_not_linked || meta?.admin_review_requested) && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-left mb-6 text-xs text-amber-800">
+          {/* Always show — form goes to admin */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-left mb-3 text-xs text-blue-800">
+            <span className="font-bold block mb-1">📋 Submitted to Admin for Review</span>
+            Your form has been sent to <strong>Accounts (Admin)</strong> for verification and approval. You will be notified once processed.
+          </div>
+
+          {(meta?.kyc_name_mismatch) && (
+            <div className="bg-orange-50 border border-orange-300 rounded-lg p-3 text-left mb-3 text-xs text-orange-800">
+              <span className="font-bold block mb-1">⚠️ Note: Document Name Mismatch Accepted</span>
+              Your {meta?.kyc_name_mismatch_type === "pan" ? "PAN" : "Bank"} details belong to a different person than the registered Payee. You have accepted these conditions.
+              Admin will manually verify this mismatch before processing payment.
+            </div>
+          )}
+
+          {(panNotLinked || meta?.pan_not_linked) && !meta?.kyc_name_mismatch && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-left mb-3 text-xs text-amber-800">
               <span className="font-bold block mb-1">⚠️ Note: Aadhaar not linked with PAN</span>
               Your form has been routed to <strong>Accounts (Admin)</strong> for manual verification because your PAN is not linked with your Aadhaar.
             </div>
@@ -914,7 +1035,7 @@ export default function FormPage() {
               {aadhaarStep === "otp" && !aadhaarVerified && (
                 <div className="space-y-3">
                   <p className="text-[11px] text-gray-600 bg-blue-50 border border-blue-200 rounded px-3 py-2">
-                    📱 An OTP has been sent to your Aadhaar-registered mobile number.
+                    📱 An OTP has been sent to the mobile number registered with your Aadhaar {(aadhaar || meta?.kyc_aadhaar_number) ? `(•••• •••• ${(aadhaar || meta?.kyc_aadhaar_number).slice(-4)})` : ""}.
                   </p>
                   <div className="flex gap-2 items-end">
                     <div className="flex-1">
@@ -941,17 +1062,28 @@ export default function FormPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={handleAadhaarGenerateOtp}
-                        disabled={aadhaarLoading}
+                        onClick={() => {
+                          setAadhaarOtp("");
+                          setAadhaarError(null);
+                          handleAadhaarGenerateOtp();
+                        }}
+                        disabled={aadhaarLoading || aadhaarRetryCountdown > 0}
                         className="bg-gray-200 text-gray-800 text-xs font-bold px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
                       >
-                        Resend OTP
+                        {aadhaarRetryCountdown > 0 ? `Resend in ${aadhaarRetryCountdown}s` : "Resend OTP"}
                       </button>
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => { setAadhaarStep("input"); setAadhaarOtp(""); setAadhaarRefId(null); }}
+                    onClick={() => {
+                      setAadhaarStep("input");
+                      setAadhaarOtp("");
+                      setAadhaarRefId(null);
+                      setMeta((prev) => prev ? { ...prev, kyc_aadhaar_ref_id: null } : prev);
+                      setAadhaarError(null);
+                      setAadhaarRetryCountdown(0);
+                    }}
                     className="text-[11px] text-gray-500 underline cursor-pointer"
                   >
                     ← Change Aadhaar number
@@ -960,7 +1092,9 @@ export default function FormPage() {
               )}
 
               {aadhaarError && (
-                <p className="text-red-600 text-xs mt-2 bg-red-50 border border-red-200 rounded px-3 py-1.5">⚠ {aadhaarError}</p>
+                <div className="mt-2 bg-red-50 border border-red-200 rounded px-3 py-2 text-xs text-red-700">
+                  <p className="font-semibold">⚠ {aadhaarError}</p>
+                </div>
               )}
             </div>
 
@@ -985,13 +1119,27 @@ export default function FormPage() {
                   {panVerified ? "✔" : "2"}
                 </span>
                 <span className="text-xs font-bold text-black">PAN Verification</span>
+                {/* Attempts remaining pill — show only if user has had a failed attempt and not yet verified */}
+                {!panVerified && !kycLocked && panInvalidAttempts > 0 && (
+                  <span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    MAX_INVALID_ATTEMPTS - panInvalidAttempts <= 0
+                      ? "bg-red-100 text-red-700"
+                      : "bg-yellow-100 text-yellow-800"
+                  }`}>
+                    {MAX_INVALID_ATTEMPTS - panInvalidAttempts <= 0
+                      ? "No attempts left"
+                      : `${MAX_INVALID_ATTEMPTS - panInvalidAttempts} attempt${MAX_INVALID_ATTEMPTS - panInvalidAttempts === 1 ? "" : "s"} remaining`}
+                  </span>
+                )}
                 {panVerified && (
                   <span className={`ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full ${
                     panNotLinked
                       ? "text-amber-800 bg-amber-100"
+                      : panMismatchDifferentPerson
+                      ? "text-orange-800 bg-orange-100"
                       : "text-green-700 bg-green-100"
                   }`}>
-                    {panNotLinked ? `Accepted (Unlinked) — ${panName}` : `Verified — ${panName}`}
+                    {panMismatchDifferentPerson ? `Accepted (Mismatch) — ${panName}` : panNotLinked ? `Accepted (Unlinked) — ${panName}` : `Verified — ${panName}`}
                   </span>
                 )}
               </div>
@@ -1033,7 +1181,7 @@ export default function FormPage() {
                       {panLoading ? "Verifying…" : panVerified ? "Verified ✔" : "Verify PAN"}
                     </button>
                   </div>
-                  {panVerified && nameMatchOk && (
+                  {panVerified && nameMatchOk && !panMismatchDifferentPerson && (
                     <p className="text-green-700 text-xs bg-green-50 border border-green-200 rounded px-3 py-1.5">
                       ✔ Aadhaar ↔ PAN name match confirmed{nameMatchScore !== null ? ` (${nameMatchScore}% similarity)` : ""}.
                     </p>
@@ -1052,12 +1200,25 @@ export default function FormPage() {
                     </div>
                   )}
 
+                  {panVerified && panMismatchDifferentPerson && (
+                    <div className="bg-orange-50 border border-orange-400 rounded-lg p-3 text-xs text-orange-900 space-y-1">
+                      <div className="font-bold flex items-center gap-1.5 text-orange-800">
+                        <span>⚠️</span>
+                        <span>PAN belongs to a different person</span>
+                      </div>
+                      <p>
+                        The name on your PAN card (<strong>{panName}</strong>) does not match the Payee Name on record (<strong>{meta?.name}</strong>).
+                        Your form will be sent to <strong>Accounts (Admin)</strong> for review. You have accepted these conditions and may proceed.
+                      </p>
+                      <p className="font-semibold text-orange-800 mt-1">
+                        ✔ You are accepting that your PAN, Aadhaar and Bank belong to a person different from the registered Payee. Admin will verify.
+                      </p>
+                    </div>
+                  )}
+
                   {panError && (
                     <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded px-3 py-1.5">
                       ⚠ {panError}
-                      {nameMatchOk === false && (
-                        <span className="block mt-1 font-semibold">Please use matching documents to proceed.</span>
-                      )}
                     </p>
                   )}
                 </div>
@@ -1074,18 +1235,34 @@ export default function FormPage() {
             }`}>
               <div className="flex items-center gap-2 mb-3">
                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                  bankVerified && bankMatchResult?.passed
-                    ? "bg-green-600 text-white"
-                    : bankVerified && !bankMatchResult?.passed
-                    ? "bg-red-600 text-white"
+                  bankVerified
+                    ? bankMismatchDifferentPerson
+                      ? "bg-orange-500 text-white"
+                      : "bg-green-600 text-white"
                     : "bg-gray-400 text-white"
                 }`}>
-                  {bankVerified && bankMatchResult?.passed ? "✔" : bankVerified && !bankMatchResult?.passed ? "✗" : "3"}
+                  {bankVerified ? "✔" : "3"}
                 </span>
                 <span className="text-xs font-bold text-black">Bank Account Verification</span>
-                {bankVerified && bankMatchResult?.passed && (
-                  <span className="ml-auto text-[11px] font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                    Verified — {bankName}
+                {/* Attempts remaining pill */}
+                {!bankVerified && !kycLocked && bankInvalidAttempts > 0 && (
+                  <span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    MAX_INVALID_ATTEMPTS - bankInvalidAttempts <= 0
+                      ? "bg-red-100 text-red-700"
+                      : "bg-yellow-100 text-yellow-800"
+                  }`}>
+                    {MAX_INVALID_ATTEMPTS - bankInvalidAttempts <= 0
+                      ? "No attempts left"
+                      : `${MAX_INVALID_ATTEMPTS - bankInvalidAttempts} attempt${MAX_INVALID_ATTEMPTS - bankInvalidAttempts === 1 ? "" : "s"} remaining`}
+                  </span>
+                )}
+                {bankVerified && (
+                  <span className={`ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                    bankMismatchDifferentPerson
+                      ? "text-orange-800 bg-orange-100"
+                      : "text-green-700 bg-green-100"
+                  }`}>
+                    {bankMismatchDifferentPerson ? `Accepted (Mismatch) — ${bankName}` : `Verified — ${bankName}`}
                   </span>
                 )}
               </div>
@@ -1112,7 +1289,7 @@ export default function FormPage() {
                         onPaste={(e) => e.preventDefault()}
                         onCopy={(e) => e.preventDefault()}
                         autoComplete="off"
-                        disabled={(bankVerified && bankMatchResult?.passed) || kycLocked}
+                        disabled={bankVerified || kycLocked}
                         className="w-full border-b-2 border-gray-200 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black transition-colors disabled:text-gray-400 disabled:border-transparent"
                       />
                     </div>
@@ -1133,7 +1310,7 @@ export default function FormPage() {
                         maxLength={11}
                         onPaste={(e) => e.preventDefault()}
                         autoComplete="off"
-                        disabled={(bankVerified && bankMatchResult?.passed) || kycLocked}
+                        disabled={bankVerified || kycLocked}
                         className="w-full border-b-2 border-gray-200 py-2 text-sm bg-transparent text-black focus:outline-none focus:border-black uppercase transition-colors disabled:text-gray-400 disabled:border-transparent"
                       />
                     </div>
@@ -1141,21 +1318,20 @@ export default function FormPage() {
                   <button
                     type="button"
                     onClick={handleBankVerify}
-                    disabled={bankLoading || !formData.bankAccountNumber || !formData.bankIfsc || (bankVerified && bankMatchResult?.passed) || kycLocked}
+                    disabled={bankLoading || !formData.bankAccountNumber || !formData.bankIfsc || bankVerified || kycLocked}
                     className="bg-black text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
-                    {bankLoading ? "Verifying…" : bankVerified && bankMatchResult?.passed ? "Verified ✔" : "Verify Bank Account"}
+                    {bankLoading ? "Verifying…" : bankVerified ? "Verified ✔" : "Verify Bank Account"}
                   </button>
 
                   {/* ── Name Match Matrix ──────────────────────────────── */}
-                  {bankVerified && bankMatchResult && (
+                  {bankVerified && bankMatchResult && !bankMismatchDifferentPerson && (
                     <div className={`rounded-lg border p-3 text-xs ${bankMatchResult.passed ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
                       <p className={`font-bold mb-2 ${bankMatchResult.passed ? "text-green-800" : "text-red-800"}`}>
                         {bankMatchResult.passed
-                          ? `✔ Name match passed — ${bankMatchResult.matchCount}/${bankMatchResult.totalPairs} pairs match (≥60%)`
-                          : `✗ Name match failed — only ${bankMatchResult.matchCount}/${bankMatchResult.totalPairs} pairs match (need ≥3)`}
+                          ? `✔ Name match passed — Bank verified successfully`
+                          : `✗ Name match failed`}
                       </p>
-                      {/* Name reference row */}
                       <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] text-gray-600 mb-2 bg-white/60 rounded px-2 py-1.5 border border-gray-100">
                         <span><b className="text-gray-800">Payee:</b> {meta?.name || "—"}</span>
                         <span><b className="text-gray-800">Aadhaar:</b> {aadhaarName}</span>
@@ -1163,13 +1339,11 @@ export default function FormPage() {
                         <span><b className="text-gray-800">Bank:</b> {bankName}</span>
                       </div>
                       <div className="space-y-1.5">
-                        {/* Column headers */}
                         <div className="grid grid-cols-3 gap-1 text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
                           <span>Pair</span>
                           <span>Similarity</span>
                           <span>Result</span>
                         </div>
-                        {/* Helper to render one row */}
                         {[
                           { key: "payee_aadhaar", label: "Payee ↔ Aadhaar" },
                           { key: "payee_pan",     label: "Payee ↔ PAN"     },
@@ -1199,6 +1373,24 @@ export default function FormPage() {
                     </div>
                   )}
 
+                  {/* Different-person bank mismatch warning */}
+                  {bankVerified && bankMismatchDifferentPerson && (
+                    <div className="bg-orange-50 border border-orange-400 rounded-lg p-3 text-xs text-orange-900 space-y-1">
+                      <div className="font-bold flex items-center gap-1.5 text-orange-800">
+                        <span>⚠️</span>
+                        <span>Bank account belongs to a different person</span>
+                      </div>
+                      <p>
+                        The name registered on this bank account (<strong>{bankName}</strong>) does not fully match
+                        the Payee Name (<strong>{meta?.name}</strong>), Aadhaar, or PAN details on record.
+                      </p>
+                      <p className="font-semibold text-orange-800 mt-1">
+                        ✔ By proceeding, you accept that your PAN, Aadhaar, and Bank belong to a person different from the registered Payee.
+                        This form will be sent to <strong>Admin</strong> for review regardless of approval.
+                      </p>
+                    </div>
+                  )}
+
                   {bankError && (
                     <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded px-3 py-1.5">
                       ⚠ {bankError}
@@ -1210,8 +1402,10 @@ export default function FormPage() {
 
             {/* KYC Status Banner */}
             {kycPassed && (
-              <div className="mt-3 bg-green-600 text-white text-xs font-bold text-center py-2 rounded-lg">
-                ✔ KYC Verified — Payee, Aadhaar, PAN &amp; Bank identity confirmed. You may now submit.
+              <div className={`mt-3 text-xs font-bold text-center py-2 rounded-lg ${(panMismatchDifferentPerson || bankMismatchDifferentPerson) ? "bg-orange-500 text-white" : "bg-green-600 text-white"}`}>
+                {(panMismatchDifferentPerson || bankMismatchDifferentPerson)
+                  ? "⚠ KYC Complete (Mismatch Flagged) — Form will be sent to Admin for review. You may now submit."
+                  : "✔ KYC Verified — Payee, Aadhaar, PAN & Bank identity confirmed. You may now submit."}
               </div>
             )}
           </div>

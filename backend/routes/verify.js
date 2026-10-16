@@ -14,14 +14,21 @@ const CF_HEADERS = {
   "Content-Type": "application/json",
 };
 
+// Legacy Aadhaar OKYC headers without x-api-version to prevent version routing mismatch
+const AADHAAR_HEADERS = {
+  "x-client-id": process.env.CASHFREE_CLIENT_ID,
+  "x-client-secret": process.env.CASHFREE_CLIENT_SECRET,
+  "Content-Type": "application/json",
+};
+
 // ─── Rate Limiting (shared simple in-memory store) ───────────────────────────
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const RATE_LIMIT_MAX = 20; // stricter for KYC endpoints
+const RATE_LIMIT_MAX = 60; // 60 requests per 15 min per IP to prevent locking shared networks
 
 function rateLimiter(req, res, next) {
-  const ip =
-    req.headers["x-forwarded-for"] || req.socket.remoteAddress || "0.0.0.0";
+  const forwarded = req.headers["x-forwarded-for"];
+  const ip = (typeof forwarded === "string" ? forwarded.split(",")[0] : req.socket.remoteAddress || "0.0.0.0").trim();
   const now = Date.now();
   if (!rateLimitMap.has(ip)) rateLimitMap.set(ip, []);
   const requests = rateLimitMap
@@ -39,7 +46,7 @@ function rateLimiter(req, res, next) {
 
 // ─── Helper: normalize name for fuzzy comparison ─────────────────────────────
 function normalizeName(name = "") {
-  return name
+  return String(name || "")
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim()
@@ -158,46 +165,68 @@ router.post("/aadhaar/generate-otp", rateLimiter, async (req, res) => {
   }
 
   try {
-    const cfRes = await fetch(`${CASHFREE_BASE}/offline-aadhaar/otp`, {
-      method: "POST",
-      headers: CF_HEADERS,
-      body: JSON.stringify({ aadhaar_number: aadhaar.trim() }),
-    });
+    let cfRes, cfData;
+    const MAX_GENERATE_RETRIES = 3;
+    for (let attempt = 1; attempt <= MAX_GENERATE_RETRIES; attempt++) {
+      cfRes = await fetch(`${CASHFREE_BASE}/offline-aadhaar/otp`, {
+        method: "POST",
+        headers: AADHAAR_HEADERS,
+        body: JSON.stringify({ aadhaar_number: aadhaar.trim() }),
+      });
 
-    const cfData = await cfRes.json();
+      cfData = await cfRes.json().catch(() => ({}));
+      console.log(`Cashfree generate-otp attempt ${attempt}/${MAX_GENERATE_RETRIES} status:`, cfRes.status, "data:", cfData);
 
-    if (!cfRes.ok || cfData.status === "INVALID") {
-      // If Cashfree UIDAI times out but still sends the OTP and gives us a refId, 
-      // we must treat it as success so the user can enter the OTP!
-      const errorRefId = cfData?.error?.refId || cfData?.ref_id;
-      if (errorRefId) {
-        if (token) {
-          const record = await Record.findOne({ $or: [{ token: new RegExp(`^${token}$`, "i") }, { payee_link_token: new RegExp(`^${token}$`, "i") }, { utr_rrn_reference_number: new RegExp(`^${token}$`, "i") }] });
-          if (record) {
-            await Record.updateOne({ _id: record._id }, { $set: { kyc_aadhaar_ref_id: errorRefId, kyc_aadhaar_number: aadhaar.trim() } }, { strict: false });
-          }
-        }
-        return res.json({
-          success: true,
-          ref_id: errorRefId,
-          message: cfData?.message || "OTP sent. Please enter it below.",
+      const isUnavailable =
+        cfRes.status === 502 ||
+        cfRes.status === 503 ||
+        cfRes.status === 504 ||
+        cfData?.message?.toLowerCase().includes("unavailable") ||
+        cfData?.error?.message?.toLowerCase().includes("unavailable") ||
+        cfData?.code === "source_unavailable" ||
+        cfData?.message?.toLowerCase().includes("bad gateway");
+
+      if (isUnavailable && attempt < MAX_GENERATE_RETRIES) {
+        console.log(`UIDAI temporarily unavailable during OTP generation. Retrying in 2.5s (attempt ${attempt + 1}/${MAX_GENERATE_RETRIES})...`);
+        await new Promise((r) => setTimeout(r, 2500));
+        continue;
+      }
+      break;
+    }
+
+    const isUnavailable =
+      cfRes.status === 502 ||
+      cfRes.status === 503 ||
+      cfRes.status === 504 ||
+      cfData?.message?.toLowerCase().includes("unavailable") ||
+      cfData?.error?.message?.toLowerCase().includes("unavailable") ||
+      cfData?.code === "source_unavailable" ||
+      cfData?.message?.toLowerCase().includes("bad gateway");
+
+    if (!cfRes.ok || cfData.status === "INVALID" || cfData.status === "FAILED" || isUnavailable) {
+      if (isUnavailable) {
+        return res.status(503).json({
+          retryable: true,
+          message: "UIDAI (Government Aadhaar server) is temporarily busy. Please wait a few seconds and try clicking 'Send OTP' again.",
         });
       }
-
       const msg = cfData?.message || cfData?.error?.message || "Failed to send OTP. Please try again.";
-      return res.status(cfRes.ok ? 400 : cfRes.status).json({ message: msg });
+      return res.status(cfRes.ok ? 400 : cfRes.status).json({
+        message: msg,
+        ref_id: cfData?.ref_id ? String(cfData.ref_id) : undefined,
+      });
     }
 
     if (token && cfData.ref_id) {
       const record = await Record.findOne({ $or: [{ token: new RegExp(`^${token}$`, "i") }, { payee_link_token: new RegExp(`^${token}$`, "i") }, { utr_rrn_reference_number: new RegExp(`^${token}$`, "i") }] });
       if (record) {
-        await Record.updateOne({ _id: record._id }, { $set: { kyc_aadhaar_ref_id: cfData.ref_id, kyc_aadhaar_number: aadhaar.trim() } }, { strict: false });
+        await Record.updateOne({ _id: record._id }, { $set: { kyc_aadhaar_ref_id: String(cfData.ref_id), kyc_aadhaar_number: aadhaar.trim() } }, { strict: false });
       }
     }
 
     return res.json({
       success: true,
-      ref_id: cfData.ref_id,
+      ref_id: String(cfData.ref_id),
       message: "OTP sent to your Aadhaar-registered mobile number.",
     });
   } catch (err) {
@@ -209,7 +238,8 @@ router.post("/aadhaar/generate-otp", rateLimiter, async (req, res) => {
 // ─── POST /api/verify/aadhaar/verify-otp ─────────────────────────────────────
 // Body: { ref_id: "...", otp: "123456", token: "..." }
 // Cashfree: POST /verification/offline-aadhaar/verify -> returns name, dob, etc.
-// Persists KYC state to DB so page refresh doesn't re-charge Cashfree.
+// UIDAI takes 10-25 seconds to process Aadhaar OTP. We use a 45-second timeout.
+// If Cashfree returns 409 (verification_pending), we poll GET /offline-aadhaar/:ref_id.
 router.post("/aadhaar/verify-otp", rateLimiter, async (req, res) => {
   const { ref_id, otp, token } = req.body;
 
@@ -222,17 +252,124 @@ router.post("/aadhaar/verify-otp", rateLimiter, async (req, res) => {
   }
 
   try {
-    const cfRes = await fetch(`${CASHFREE_BASE}/offline-aadhaar/verify`, {
-      method: "POST",
-      headers: CF_HEADERS,
-      body: JSON.stringify({ otp: otp.trim(), ref_id }),
-    });
+    const cleanRefId = String(ref_id).trim();
+    const cleanOtp = String(otp).trim();
 
-    const cfData = await cfRes.json();
+    // 45-second timeout for UIDAI
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
 
-    if (!cfRes.ok || cfData.status === "INVALID") {
-      const msg =
-        cfData?.message || cfData?.error?.message || "Invalid OTP. Please try again.";
+    let cfRes, cfData;
+    try {
+      cfRes = await fetch(`${CASHFREE_BASE}/offline-aadhaar/verify`, {
+        method: "POST",
+        headers: AADHAAR_HEADERS,
+        body: JSON.stringify({ otp: cleanOtp, ref_id: cleanRefId }),
+        signal: controller.signal,
+      });
+      cfData = await cfRes.json().catch(() => ({}));
+      console.log("Cashfree verify-otp status:", cfRes.status, cfData);
+    } catch (fetchErr) {
+      if (fetchErr.name === "AbortError") {
+        return res.status(503).json({
+          retryable: true,
+          message: "UIDAI (Government Aadhaar server) took too long to respond. Please click 'Resend OTP' to try again.",
+        });
+      }
+      throw fetchErr;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    console.log("Cashfree verify-otp initial status:", cfRes.status, cfData);
+
+    // If Cashfree returns 409 (verification_pending), UIDAI is processing in the background.
+    // Poll Cashfree GET /offline-aadhaar/:ref_id every 3 seconds (up to 6 times = 18s).
+    if (cfRes.status === 409 || cfData?.code === "verification_pending" || cfData?.message?.includes("Processing request")) {
+      console.log("Cashfree returned verification_pending (409). Polling GET /offline-aadhaar/" + cleanRefId + "...");
+      for (let poll = 1; poll <= 6; poll++) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        try {
+          const pollRes = await fetch(`${CASHFREE_BASE}/offline-aadhaar/${cleanRefId}`, {
+            method: "GET",
+            headers: AADHAAR_HEADERS,
+          });
+          const pollData = await pollRes.json().catch(() => ({}));
+          const polledName = pollData?.data?.name || pollData?.name || pollData?.full_name;
+          console.log(`Poll attempt ${poll}/6 — status:`, pollRes.status, pollData?.status, polledName);
+          if (polledName && typeof polledName === "string" && polledName.trim() !== "") {
+            cfRes = { ok: true, status: 200 };
+            cfData = pollData;
+            break;
+          }
+          if (pollData?.status === "VERIFICATION_FAILED" || pollData?.status === "FAILED") {
+            cfRes = { ok: false, status: 400 };
+            cfData = pollData;
+            break;
+          }
+        } catch (pollErr) {
+          console.warn("Poll attempt error:", pollErr);
+        }
+      }
+    }
+
+    console.log("Cashfree verify-otp final status:", cfRes.status, cfData);
+
+    if (!cfRes.ok || cfData.status === "INVALID" || cfData.status === "FAILED" || cfData.status === "VERIFICATION_FAILED") {
+      let msg = cfData?.message || cfData?.error?.message || "Invalid OTP. Please try again.";
+
+      // Case 1: Gateway / unavailability error from UIDAI
+      const isGatewayError =
+        cfRes.status === 502 ||
+        cfRes.status === 503 ||
+        cfRes.status === 504 ||
+        msg.toLowerCase().includes("unavailable") ||
+        cfData?.code === "source_unavailable" ||
+        msg.toLowerCase().includes("bad gateway");
+
+      if (isGatewayError) {
+        return res.status(503).json({
+          retryable: true,
+          message: "UIDAI (Government Aadhaar server) is temporarily busy. Your OTP is still valid — please wait 5-10 seconds and click 'Verify OTP' again.",
+        });
+      }
+
+      // Case 2: Session expired (OTP timeout, invalid ref, or already consumed)
+      const isSessionExpired =
+        msg.toLowerCase().includes("session expired") ||
+        msg.toLowerCase().includes("otp expired") ||
+        msg.toLowerCase().includes("session timed out") ||
+        msg.toLowerCase().includes("reference id expired") ||
+        msg.toLowerCase().includes("invalid ref_id") ||
+        msg.toLowerCase().includes("invalid reference") ||
+        msg.toLowerCase().includes("request has expired") ||
+        cfData?.code === "session_expired" ||
+        cfData?.code === "otp_expired";
+
+      if (isSessionExpired) {
+        // Clear stale ref_id from DB so page refresh doesn't restore a dead OTP session
+        if (token) {
+          try {
+            const record = await Record.findOne({ $or: [{ token: new RegExp(`^${token}$`, "i") }, { payee_link_token: new RegExp(`^${token}$`, "i") }, { utr_rrn_reference_number: new RegExp(`^${token}$`, "i") }] });
+            if (record) {
+              await Record.updateOne({ _id: record._id }, { $unset: { kyc_aadhaar_ref_id: "" } }, { strict: false });
+            }
+          } catch (_) { /* non-fatal */ }
+        }
+        return res.status(400).json({
+          sessionExpired: true,
+          message: "⏱ OTP session has expired. Please click 'Resend OTP' to receive a new OTP.",
+        });
+      }
+
+      // Case 3: Still pending after polling
+      if (cfRes.status === 409 || cfData?.code === "verification_pending" || msg.includes("Processing request")) {
+        return res.status(503).json({
+          retryable: true,
+          message: "UIDAI server is taking longer than usual to complete verification. Your OTP is still valid — please click 'Verify OTP' again in a few seconds.",
+        });
+      }
+
       return res.status(cfRes.ok ? 400 : cfRes.status).json({ message: msg });
     }
 
@@ -249,7 +386,7 @@ router.post("/aadhaar/verify-otp", rateLimiter, async (req, res) => {
       });
     }
 
-      // ── Persist to DB so refresh doesn't re-charge ────────────────────────────
+    // ── Persist to DB so refresh doesn't re-charge ────────────────────────────
     if (token) {
       const record = await Record.findOne({ $or: [{ token: new RegExp(`^${token}$`, "i") }, { payee_link_token: new RegExp(`^${token}$`, "i") }, { utr_rrn_reference_number: new RegExp(`^${token}$`, "i") }] });
       if (record) {
@@ -268,47 +405,69 @@ router.post("/aadhaar/verify-otp", rateLimiter, async (req, res) => {
     });
   } catch (err) {
     console.error("Aadhaar OTP verification error:", err);
-
     return res.status(500).json({ message: "Server error. Please try again." });
   }
 });
 
+
 // ─── KYC Lock Helper ────────────────────────────────────────────────────────
-async function applyFailedKycLock(token, record) {
-  if (!record || !token) return null;
-  const now = new Date();
-  const attempts = (record.kyc_failed_attempts || 0) + 1;
-  let lockUntil = null;
-  let perm = false;
-
-  if (attempts < 3) {
-    await Record.updateOne(
-      { _id: record._id },
-      { $set: { kyc_failed_attempts: attempts } }
-    );
-    return `Name mismatch detected. (Attempt ${attempts} of 3). Please verify that your PAN and Aadhaar match.`;
-  }
-
-  if (attempts === 3) lockUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  else if (attempts === 4) lockUntil = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-  else { lockUntil = new Date(now.getTime() + 999 * 24 * 60 * 60 * 1000); perm = true; }
+// For INVALID PAN/Bank (genuinely wrong format/non-existent): 2 attempts then lock permanently (no time delays).
+// For NAME MISMATCH (different person's valid docs): route to admin, don't lock.
+async function applyInvalidDocLock(token, record, type) {
+  if (!record || !token) return { locked: false, message: null };
+  const fieldKey = type === "pan" ? "pan_invalid_attempts" : "bank_invalid_attempts";
+  const attempts = (record[fieldKey] || 0) + 1;
 
   await Record.updateOne(
     { _id: record._id },
-    { $set: { kyc_failed_attempts: attempts, kyc_locked_until: lockUntil, kyc_permanently_locked: perm } }
+    { $set: { [fieldKey]: attempts } },
+    { strict: false }
   );
 
-  const hours = attempts === 3 ? 24 : attempts === 4 ? 48 : "permanently";
-  return `Name mismatch detected too many times. Your KYC has been locked for ${hours} ${perm ? '' : 'hours'}. Please try again later.`;
+  if (attempts >= 2) {
+    // Lock permanently after 2 invalid attempts
+    await Record.updateOne(
+      { _id: record._id },
+      { $set: { kyc_permanently_locked: true } },
+      { strict: false }
+    );
+    return {
+      locked: true,
+      message: `Too many invalid ${type === "pan" ? "PAN" : "bank"} attempts. This form has been permanently locked. Please contact the accounts section.`,
+    };
+  }
+
+  const remaining = 2 - attempts;
+  return {
+    locked: false,
+    message: `Invalid ${type === "pan" ? "PAN" : "bank"} details. You have ${remaining} attempt${remaining === 1 ? "" : "s"} remaining before this form is locked.`,
+  };
+}
+
+// For name mismatches (different person's docs) — route to admin, do NOT lock
+async function applyNameMismatchFlag(record, type, details) {
+  if (!record) return;
+  const now = new Date();
+  await Record.updateOne(
+    { _id: record._id },
+    {
+      $set: {
+        kyc_name_mismatch: true,
+        kyc_name_mismatch_type: type,
+        kyc_name_mismatch_details: details,
+        admin_review_requested: true,
+        admin_review_reason: `Name mismatch at ${type} step: ${details}`,
+        kyc_name_mismatch_at: now,
+      }
+    },
+    { strict: false }
+  );
 }
 
 function checkKycLock(record) {
   if (!record) return null;
-  if (record.kyc_permanently_locked) return "KYC is permanently blocked due to too many failed attempts.";
-  if (record.kyc_locked_until && new Date() < record.kyc_locked_until) {
-    const hoursLeft = Math.ceil((record.kyc_locked_until - new Date()) / (1000 * 60 * 60));
-    return `KYC is currently locked for ${hoursLeft} more hours due to previous mismatches.`;
-  }
+  if (record.kyc_permanently_locked) return "This form has been permanently locked due to too many failed attempts. Please contact the accounts section.";
+  // No time-based locks anymore — removed 24h/48h logic
   return null;
 }
 
@@ -468,6 +627,8 @@ router.post("/pan", rateLimiter, async (req, res) => {
     let nameMatch = null;
     let nameMatchScore = null;
     let nameMatchMessage = null;
+    let nameMismatchDifferentPerson = false;
+
     if (aadhaar_name) {
       const score = nameSimilarity(aadhaar_name, panName);
       nameMatch = score >= 0.6;
@@ -476,37 +637,52 @@ router.post("/pan", rateLimiter, async (req, res) => {
         ? `Aadhaar name matches PAN name (${nameMatchScore}% similarity).`
         : `Name mismatch: Aadhaar "${aadhaar_name}" vs PAN "${panName}" (${nameMatchScore}% similarity).`;
 
-      // HYPER-STRICT RULE: Payee Name must also match Aadhaar and PAN here
-      if (nameMatch && record && record.name && record.name.trim() !== "") {
+      // Check if Payee Name matches — if not, flag as different person (route to admin, don't lock)
+      if (record && record.name && record.name.trim() !== "") {
         const payeeAadhaarScore = nameSimilarity(record.name, aadhaar_name);
         const payeePanScore = nameSimilarity(record.name, panName);
-        
+
         if (payeeAadhaarScore < 0.6 || payeePanScore < 0.6) {
-          nameMatch = false; // Force lock here at step 2
-          nameMatchMessage = `Name mismatch: Identity documents do not match the required Payee Name "${record.name}".`;
+          // Different person's documents — flag for admin review, allow form to proceed
+          nameMismatchDifferentPerson = true;
+          nameMatchMessage = `The name on your documents ("${panName}") does not match the Payee Name ("${record.name}") on record. This form will be sent to Admin for review. You may proceed.`;
         }
       }
     }
 
     // ── Persist PAN to DB ─────────────────────────────────────────────────────
     if (token && panName) {
-      if (nameMatch === false) {
-        const lockMsg = await applyFailedKycLock(token, record);
-        return res.status(403).json({ message: lockMsg });
+      // Name match between Aadhaar and PAN failed completely (e.g. clearly invalid/wrong PAN)
+      if (nameMatch === false && !nameMismatchDifferentPerson) {
+        const lockResult = await applyInvalidDocLock(token, record, "pan");
+        if (lockResult.locked) {
+          return res.status(403).json({ message: lockResult.message });
+        }
+        // Not locked yet — allow retry, show warning
+        return res.status(400).json({ message: lockResult.message, pan_mismatch: true });
+      }
+
+      const updateFields = {
+        kyc_pan_verified: true,
+        kyc_pan_name: panName,
+        kyc_pan_number: pan,
+        kyc_pan_match_score: nameMatchScore,
+        pan_not_linked: isPanNotLinked,
+        pan_aadhaar_linked: !isPanNotLinked,
+      };
+
+      // If different person's docs — flag for admin review
+      if (nameMismatchDifferentPerson) {
+        await applyNameMismatchFlag(record, "pan", nameMatchMessage);
+        updateFields.kyc_pan_verified = true; // still allow form to proceed
+        updateFields.kyc_name_mismatch = true;
+        // Allow form to proceed to bank step
+        nameMatch = true;
       }
 
       await Record.updateOne(
         { _id: record._id },
-        { 
-          $set: { 
-            kyc_pan_verified: true, 
-            kyc_pan_name: panName,
-            kyc_pan_number: pan,
-            kyc_pan_match_score: nameMatchScore,
-            pan_not_linked: isPanNotLinked,
-            pan_aadhaar_linked: !isPanNotLinked
-          } 
-        },
+        { $set: updateFields },
         { strict: false }
       );
     }
@@ -514,13 +690,16 @@ router.post("/pan", rateLimiter, async (req, res) => {
     return res.json({
       success: true,
       pan_name: panName,
-      name_match: nameMatch,
+      name_match: nameMatch ?? true,
       name_match_score: nameMatchScore,
       name_match_message: nameMatchMessage,
+      name_mismatch_different_person: nameMismatchDifferentPerson,
       pan_not_linked: isPanNotLinked,
       pan_aadhaar_linked: !isPanNotLinked,
       aadhaar_seeding_status: seedingStatus,
-      message: isPanNotLinked
+      message: nameMismatchDifferentPerson
+        ? "⚠️ The documents you provided belong to a different person. This form will be routed to Admin for review. You may proceed to fill and submit."
+        : isPanNotLinked
         ? "PAN verified. Note: Your Aadhaar is not linked with PAN. You can proceed with the form; it will be sent to Admin for review."
         : "PAN verified successfully.",
     });
@@ -566,6 +745,14 @@ router.post("/bank", rateLimiter, async (req, res) => {
     const accountStatus = cfData?.account_status || cfData?.data?.account_status || cfData?.status || "";
 
     if (!cfRes.ok || accountStatus === "INVALID") {
+      // Invalid bank account — apply 2-attempt lock
+      if (token && record) {
+        const lockResult = await applyInvalidDocLock(token, record, "bank");
+        if (lockResult.locked) {
+          return res.status(403).json({ message: lockResult.message });
+        }
+        return res.status(400).json({ message: lockResult.message, bank_invalid: true });
+      }
       const msg = cfData?.message || cfData?.error?.message || "Bank account verification failed. Please check your account number and IFSC.";
       return res.status(cfRes.ok ? 400 : cfRes.status).json({ message: msg });
     }
@@ -583,27 +770,34 @@ router.post("/bank", rateLimiter, async (req, res) => {
       matchResult = nameMatchAll4("", aadhaar_name, pan_name, bankName);
     }
 
-    if (token && bankName) {
-      const overallPassed = matchResult ? matchResult.passed : false;
+    // Determine if this is a different-person mismatch or just a valid mismatch
+    const overallPassed = matchResult ? matchResult.passed : false;
+    const isBankDifferentPerson = !overallPassed && matchResult !== null;
 
-      if (!overallPassed) {
-        const lockMsg = await applyFailedKycLock(token, record);
-        return res.status(403).json({ message: lockMsg });
+    if (token && bankName) {
+      const updateFields = {
+        kyc_bank_verified: true,
+        kyc_bank_name: bankName,
+        kyc_bank_account: account_number.trim(),
+        kyc_bank_ifsc: ifsc.trim().toUpperCase(),
+        kyc_bank_match: matchResult,
+        // Always mark kyc_passed true so the form can be submitted to admin
+        kyc_passed: true,
+        kyc_passed_at: new Date(),
+      };
+
+      if (isBankDifferentPerson) {
+        // Name mismatch — flag for admin review, don't lock
+        await applyNameMismatchFlag(record, "bank", `Bank name "${bankName}" did not fully match Payee/Aadhaar/PAN names`);
+        updateFields.kyc_name_mismatch = true;
+        updateFields.admin_review_requested = true;
+        // Force matchResult.passed so frontend allows submission
+        if (matchResult) matchResult = { ...matchResult, passed: true, mismatch_flagged_for_admin: true };
       }
 
       await Record.updateOne(
         { _id: record._id },
-        { 
-          $set: { 
-            kyc_bank_verified: true,
-            kyc_bank_name: bankName,
-            kyc_bank_account: account_number.trim(),
-            kyc_bank_ifsc: ifsc.trim().toUpperCase(),
-            kyc_bank_match: matchResult,
-            kyc_passed: true,
-            kyc_passed_at: new Date()
-          } 
-        },
+        { $set: updateFields },
         { strict: false }
       );
     }
@@ -612,10 +806,11 @@ router.post("/bank", rateLimiter, async (req, res) => {
       success: true,
       bank_name: bankName,
       account_status: accountStatus,
-      match: matchResult,
-      message: matchResult && matchResult.passed
-        ? `Bank verified. Name match passed.`
-        : `Name mismatch: The Admin-entered Payee Name must match ALL of your official documents (Aadhaar, PAN, and Bank). Please contact accounts to correct your name.`,
+      match: matchResult ? { ...matchResult, passed: true } : matchResult,
+      bank_mismatch_different_person: isBankDifferentPerson,
+      message: isBankDifferentPerson
+        ? `⚠️ Bank account name ("${bankName}") does not fully match. This form will be sent to Admin for review. You may proceed to submit.`
+        : `Bank verified. Name match passed.`,
     });
   } catch (err) {
     console.error("Bank account verification error:", err);
@@ -624,5 +819,6 @@ router.post("/bank", rateLimiter, async (req, res) => {
 });
 
 module.exports = router;
+
 
 
